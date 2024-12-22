@@ -1,6 +1,6 @@
 using System.Text;
 using Arc4u.ServiceModel;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace Arc4u;
 
@@ -97,14 +97,14 @@ public class AppException : Exception
         IEnumerable<Message> messages;
         try
         {
-            messages = JsonConvert.DeserializeObject<IEnumerable<Message>>(content) ?? [];
+            messages = JsonSerializer.Deserialize<IEnumerable<Message>>(content) ?? [];
         }
         catch (Exception)
         {
             // transform the old format to new one.
             content = content.Replace("\"Category\":\"Described\"", "\"Category\":\"Business\"");
             content = content.Replace("\"Category\":\"Undescribed\"", "\"Category\":\"Technical\"");
-            messages = JsonConvert.DeserializeObject<IEnumerable<Message>>(content) ?? [];
+            messages = JsonSerializer.Deserialize<IEnumerable<Message>>(content) ?? [];
         }
 
         throw new AppException(messages);

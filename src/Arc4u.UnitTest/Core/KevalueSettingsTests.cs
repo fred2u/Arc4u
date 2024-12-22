@@ -1,8 +1,7 @@
-﻿using Arc4u.Configuration;
+using Arc4u.Configuration;
 using Xunit;
 
 namespace Arc4u.UnitTest.Core;
-
 
 [Trait("Category", "CI")]
 public class KevalueSettingsTests

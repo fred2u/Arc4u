@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Runtime.Serialization;
 using System.Xml;
 using System.Xml.Serialization;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
 
 namespace Arc4u.Security.Principal;
 
@@ -136,7 +136,7 @@ public sealed class UserProfile : IXmlSerializable
     #region IProfile Members
 
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string DisplayName { get; private set; }
 
     /// <summary>
@@ -144,7 +144,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The email.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Email { get; private set; }
 
     /// <summary>
@@ -152,7 +152,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The department.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Department { get; private set; }
 
     /// <summary>
@@ -160,7 +160,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The company.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Company { get; private set; }
 
     /// <summary>
@@ -168,7 +168,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The name of the given.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string GivenName { get; private set; }
 
     /// <summary>
@@ -176,7 +176,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The surname.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string SurName { get; private set; }
 
     /// <summary>
@@ -184,7 +184,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The sid.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Sid { get; private set; }
 
     /// <summary>
@@ -192,7 +192,7 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The state.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string State { get; private set; }
 
     /// <summary>
@@ -200,88 +200,90 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The mobile.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Mobile { get; private set; }
     /// <summary>
     /// Gets the telephone.
     /// </summary>
     /// <value>The telephone.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Telephone { get; private set; }
     /// <summary>
     /// Gets the internal phone.
     /// </summary>
     /// <value>The internal phone.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string InternalPhone { get; private set; }
     /// <summary>
     /// Gets the fax.
     /// </summary>
     /// <value>The fax.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Fax { get; private set; }
     /// <summary>
     /// Gets the name of the principal.
     /// </summary>
     /// <value>The name of the principal.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string PrincipalName { get; private set; }
     /// <summary>
     /// Gets the postal code.
     /// </summary>
     /// <value>The postal code.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string PostalCode { get; private set; }
 
     /// <summary>
     /// Get the Street defined in the address.
     /// </summary>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Street { get; private set; }
     /// <summary>
     /// Gets the room.
     /// </summary>
     /// <value>The room.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Room { get; private set; }
     /// <summary>
     /// Gets the initials.
     /// </summary>
     /// <value>The initials.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Initials { get; private set; }
     /// <summary>
     /// Gets the name of the sam account.
     /// </summary>
     /// <value>The name of the sam account.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string SamAccountName { get; private set; }
 
     /// <summary>
     /// Get the domain.
     /// </summary>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Domain { get; private set; }
     /// <summary>
     /// Gets the culture.
     /// </summary>
     /// <value>The culture.</value>
     [DataMember(Name = "Culture")]
-    [JsonProperty(PropertyName = "Culture")]
+    [JsonInclude]
+    [JsonPropertyName("Culture")]
     private string _culture;
 
     [IgnoreDataMember]
     [XmlIgnore]
+    [JsonIgnore]
     public CultureInfo Culture
     {
         get => new CultureInfo(_culture);
@@ -292,11 +294,13 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The current culture.</value>
     [DataMember(Name = "CurrentCulture")]
-    [JsonProperty(PropertyName = "CurrentCulture")]
+    [JsonPropertyName("CurrentCulture")]
+    [JsonInclude]
     private string _currentCulture;
 
     [IgnoreDataMember]
     [XmlIgnore]
+    [JsonIgnore]
     public CultureInfo CurrentCulture
     {
         get => new CultureInfo(_currentCulture);
@@ -308,14 +312,14 @@ public sealed class UserProfile : IXmlSerializable
     /// </summary>
     /// <value>The name of the common.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string CommonName { get; private set; }
     /// <summary>
     /// Gets the description.
     /// </summary>
     /// <value>The description.</value>
     [DataMember]
-    [JsonProperty]
+    [JsonInclude]
     public string Description { get; private set; }
 
     #endregion
@@ -323,7 +327,8 @@ public sealed class UserProfile : IXmlSerializable
     /// <summary>
     /// Give the full principal name based on the domain and the sammaccountname.
     /// </summary>
-    /// 
+    ///
+    [JsonIgnore]
     public string Name
     {
         get { return string.Format(CultureInfo.InvariantCulture, @"{0}\{1}", Domain, SamAccountName); }

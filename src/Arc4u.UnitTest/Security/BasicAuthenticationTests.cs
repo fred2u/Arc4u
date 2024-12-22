@@ -82,7 +82,7 @@ public class BasicAuthenticationTests
         sut.BasicSettings.Values[TokenKeys.Scope].Should().Be(string.Join(' ', basicSettings.Scopes));
         sut.BasicSettings.Values.ContainsKey(TokenKeys.AuthorityKey).Should().BeFalse();
 
-        var sutAuthority = app.GetRequiredService<IOptionsMonitor<AuthorityOptions>>().Get("Basic");
+        app.GetRequiredService<IOptionsMonitor<AuthorityOptions>>().Get("Basic");
     }
 
     [Fact]

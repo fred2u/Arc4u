@@ -5,15 +5,15 @@ using IContainerRegistry = Prism.Ioc.IContainerRegistry;
 
 namespace Prism.DI.Ioc;
 
-public abstract class DIContainerExtension : IContainerExtension<IServiceProvider>
+public abstract class DIContainerExtension : IContainerExtension<IContainer>
 {
-    protected IServiceProvider Container { get; }
+    protected IContainer Container { get; }
 
     public bool SupportsModules => true;
 
-    IServiceProvider IContainerExtension<IServiceProvider>.Instance => Container;
+    IContainer IContainerExtension<IContainer>.Instance => Container;
 
-    public DIContainerExtension(IServiceProvider container)
+    public DIContainerExtension(IContainer container)
     {
         Container = container;
     }
@@ -83,11 +83,11 @@ public abstract class DIContainerExtension : IContainerExtension<IServiceProvide
 
     public bool IsRegistered(Type type)
     {
-        return Container.TryResolve(type, out var value);
+        return Container.TryResolve(type, out var _);
     }
 
     public bool IsRegistered(Type type, string name)
     {
-        return Container.TryResolve(type, name, out var value);
+        return Container.TryResolve(type, name, out var _);
     }
 }
