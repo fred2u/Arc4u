@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+using System.Text;
 using Arc4u.Diagnostics;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -12,6 +14,7 @@ public class ForceOpenIdMiddleWare
 {
     private readonly RequestDelegate _next;
     private readonly ForceOpenIdMiddleWareOptions _options;
+    private readonly Regex _pathsRegex;
 
     public ForceOpenIdMiddleWare(RequestDelegate next, ForceOpenIdMiddleWareOptions options)
     {
@@ -20,6 +23,27 @@ public class ForceOpenIdMiddleWare
         ArgumentNullException.ThrowIfNull(options);
 
         _options = options;
+        _pathsRegex = PathsRegex(_options.ForceAuthenticationForPaths);
+    }
+
+    // Create a regex expression based on the array of string passed.
+    // Avoid string manipulation during the request.
+    private static Regex PathsRegex(IList<string> paths)
+    {
+        var sb = new StringBuilder();
+        sb.Append("\\S*(");
+
+        foreach (var path in paths)
+        {
+            sb.Append(path.Replace("*", "\\S+"));
+            sb.Append('|');
+        }
+
+        sb.Remove(sb.Length - 1, 1);
+        sb.Append(')');
+
+        return new Regex(sb.ToString(), RegexOptions.IgnoreCase);
+
     }
 
     public async Task InvokeAsync(HttpContext context, ILogger<ForceOpenIdMiddleWare> logger)
@@ -30,14 +54,9 @@ public class ForceOpenIdMiddleWare
             // authentication. We can add the start of the path to check and in this case we force a login!
             if (context.User is not null && context.User.Identity is not null && context.User.Identity.IsAuthenticated is false)
             {
-                if (_options.ForceAuthenticationForPaths.Any(r =>
-                {
-                    return context.Request.Path.HasValue
-                           && (r.Last().Equals('*') ?
-                                context.Request.Path.Value.StartsWith(r.Remove(r.Length - 1), StringComparison.OrdinalIgnoreCase)
-                                :
-                                 context.Request.Path.Value.Equals(r, StringComparison.OrdinalIgnoreCase));
-                }))
+                if (_options.ForceAuthenticationForPaths.Any() &&
+                    context.Request.Path.HasValue &&
+                    _pathsRegex.IsMatch(context.Request.Path.Value))
                 {
                     logger.Technical().LogDebug("Force an OpenId connection.");
                     var cleanUri = new Uri(new Uri(context.Request.GetEncodedUrl()).GetLeftPart(UriPartial.Path));
@@ -60,4 +79,3 @@ public class ForceOpenIdMiddleWare
         await _next(context).ConfigureAwait(false);
     }
 }
-
