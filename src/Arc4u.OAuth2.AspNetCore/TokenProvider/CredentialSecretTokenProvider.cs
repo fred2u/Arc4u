@@ -10,7 +10,7 @@ namespace Arc4u.OAuth2.TokenProvider;
 
 [Export(CredentialSecretTokenProvider.ProviderName, typeof(ITokenProvider))]
 
-public class CredentialSecretTokenProvider : ITokenProvider
+public class CredentialSecretTokenProvider(IServiceProvider container, ILogger<CredentialSecretTokenProvider> logger) : ITokenProvider
 {
     public const string ProviderName = "ClientSecret";
 
@@ -18,15 +18,6 @@ public class CredentialSecretTokenProvider : ITokenProvider
     private const string Password = "Password";
     private const string Credential = "Credential";
     private const string BasicProviderId = "BasicProviderId";
-
-    public CredentialSecretTokenProvider(IServiceProvider container, ILogger<CredentialSecretTokenProvider> logger)
-    {
-        _containerResolve = container;
-        _logger = logger;
-    }
-
-    private readonly IServiceProvider _containerResolve;
-    private readonly ILogger<CredentialSecretTokenProvider> _logger;
 
     public async Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? _)
     {
@@ -45,10 +36,10 @@ public class CredentialSecretTokenProvider : ITokenProvider
         }
         else if (settings.Values.ContainsKey(Credential))
         {
-            credential = new CredentialsResult(false).ExtractCredential(settings.Values[Credential], _logger);
+            credential = new CredentialsResult(false).ExtractCredential(settings.Values[Credential], logger);
         }
 
-        if (!settings.Values.ContainsKey(BasicProviderId) || !_containerResolve.TryGetService<ICredentialTokenProvider>(settings.Values[BasicProviderId], out var credentialToken))
+        if (!settings.Values.ContainsKey(BasicProviderId) || !container.TryGetService<ICredentialTokenProvider>(settings.Values[BasicProviderId], out var credentialToken))
         {
             throw new ConfigurationException("No BasicProviderId exist to perform the request to the STS.");
         }
@@ -62,7 +53,10 @@ public class CredentialSecretTokenProvider : ITokenProvider
         basicSettings.Add(TokenKeys.AuthenticationTypeKey, settings.Values[TokenKeys.AuthenticationTypeKey]);
         basicSettings.AddifNotNullOrEmpty(TokenKeys.AuthorityKey, settings.Values.ContainsKey(TokenKeys.AuthorityKey) ? settings.Values[TokenKeys.AuthorityKey] : string.Empty);
 
-        return await credentialToken!.GetTokenAsync(basicSettings, credential).ConfigureAwait(false);
+        var result = await credentialToken!.GetTokenAsync(basicSettings, credential).ConfigureAwait(false);
+        result.LogIfFailed();
+
+        return result.IsFailed ? null : result.Value;
     }
 
     public ValueTask SignOutAsync(IKeyValueSettings settings, CancellationToken cancellationToken)

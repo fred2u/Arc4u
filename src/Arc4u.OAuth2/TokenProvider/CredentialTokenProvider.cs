@@ -4,29 +4,23 @@ using Arc4u.Diagnostics;
 using Arc4u.OAuth2.Options;
 using Arc4u.OAuth2.Security.Principal;
 using Arc4u.OAuth2.Token;
-using Arc4u.ServiceModel;
+using Arc4u.Results.Validation;
+using FluentResults;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Arc4u.OAuth2.TokenProvider;
 
 [Export(CredentialTokenProvider.ProviderName, typeof(ICredentialTokenProvider)), Shared]
-public class CredentialTokenProvider : ICredentialTokenProvider
+public class CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IOptionsMonitor<AuthorityOptions> authorityOptions) : ICredentialTokenProvider
 {
     public const string ProviderName = "CredentialDirect";
 
-    private readonly ILogger<CredentialTokenProvider> _logger;
-    private readonly IOptionsMonitor<AuthorityOptions> _authorityOptions;
+    private readonly ILogger<CredentialTokenProvider> _logger = logger;
 
-    public CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IOptionsMonitor<AuthorityOptions> authorityOptions)
+    public async Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings settings, CredentialsResult credential)
     {
-        _logger = logger;
-        _authorityOptions = authorityOptions;
-    }
-
-    public async Task<TokenInfo> GetTokenAsync(IKeyValueSettings settings, CredentialsResult credential)
-    {
-        var messages = GetContext(settings, out var clientId, out var authority, out var scope, out var clientSecret);
+        var result = GetContext(settings, out var clientId, out var authority, out var scope, out var clientSecret);
 
         if (null == authority)
         {
@@ -40,16 +34,15 @@ public class CredentialTokenProvider : ICredentialTokenProvider
 
         if (string.IsNullOrWhiteSpace(credential.Upn))
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Error, "No Username is provided."));
+            result.WithValidationError("No Username is provided.");
         }
 
         if (string.IsNullOrWhiteSpace(credential.Password))
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Warning, "No password is provided."));
+            result.WithValidationError("No password is provided.");
         }
 
-        messages.LogAndThrowIfNecessary(_logger);
-        messages.Clear();
+        result.LogIfFailed();
 
         // no cache, do a direct call on every calls.
         _logger.Technical().Debug($"Call STS: {authority} for user: {credential.Upn}").Log();
@@ -57,49 +50,46 @@ public class CredentialTokenProvider : ICredentialTokenProvider
 
     }
 
-    private Messages GetContext(IKeyValueSettings settings, out string clientId, out AuthorityOptions? authority, out string scope, out string clientSecret)
+    private Result GetContext(IKeyValueSettings settings, out string clientId, out AuthorityOptions? authority, out string scope, out string clientSecret)
     {
         // Check the information.
-        var messages = new Messages();
+        Result result = new();
 
         if (null == settings)
         {
-            messages.Add(new Message(Arc4u.ServiceModel.MessageCategory.Technical,
-                                     Arc4u.ServiceModel.MessageType.Error,
-                                     "Settings parameter cannot be null."));
+            result.WithValidationError("Settings parameter cannot be null.");
             clientId = string.Empty;
             authority = null;
             scope = string.Empty;
             clientSecret = string.Empty;
 
-            return messages;
+            return result;
         }
 
         // Valdate arguments.
         if (!settings.Values.ContainsKey(TokenKeys.AuthorityKey))
         {
-            authority = _authorityOptions.Get("Default");
+            authority = authorityOptions.Get("Default");
         }
         else
         {
-            authority = _authorityOptions.Get(settings.Values[TokenKeys.AuthorityKey]);
+            authority = authorityOptions.Get(settings.Values[TokenKeys.AuthorityKey]);
         }
 
         if (!settings.Values.ContainsKey(TokenKeys.ClientIdKey))
         {
-            messages.Add(new Message(Arc4u.ServiceModel.MessageCategory.Technical,
-                     Arc4u.ServiceModel.MessageType.Error,
-                     "ClientId is missing. Cannot process the request."));
+            result.WithValidationError("ClientId is missing. Cannot process the request.");
         }
+
         _logger.Technical().Debug($"Creating an authentication context for the request.").Log();
         clientId = settings.Values[TokenKeys.ClientIdKey];
         clientSecret = settings.Values.ContainsKey(TokenKeys.ClientSecret) ? settings.Values[TokenKeys.ClientSecret] : string.Empty;
         // More for backward compatibility! We should throw an error message if scope is not defined...
         scope = !settings.Values.ContainsKey(TokenKeys.Scope) ? "openid" : settings.Values[TokenKeys.Scope];
-        return messages;
+        return result;
     }
 
-    private async Task<TokenInfo> GetTokenInfoAsync(string? clientSecret, string clientId, Uri tokenEndpoint, string scope, string upn, string pwd)
+    private async Task<Result<TokenInfo>> GetTokenInfoAsync(string? clientSecret, string clientId, Uri tokenEndpoint, string scope, string upn, string pwd)
     {
         using var handler = new HttpClientHandler { UseDefaultCredentials = true };
         using var client = new HttpClient(handler);
@@ -164,17 +154,16 @@ public class CredentialTokenProvider : ICredentialTokenProvider
                     if (dictionary.TryGetValue("error", out var tokenErrorCode))
                     {
                         // error description is optional. So is error_uri, but we don't use it.
-                        string? error_description;
-                        if (!dictionary.TryGetValue("error_description", out error_description))
+                        if (!dictionary.TryGetValue("error_description", out var error_description))
                         {
                             error_description = "No error description";
                         }
 
-                        throw new AppException(new Message(Arc4u.ServiceModel.MessageCategory.Technical, MessageType.Error, tokenErrorCode, response.StatusCode.ToString(), $"{error_description} ({upn})"));
+                        return Result.Fail(ValidationError.Create($"{error_description} ({upn})").WithCode(tokenErrorCode ?? string.Empty));
                     }
                 }
                 // if we can't write a better exception, issue a more general one
-                throw new AppException(new Message(Arc4u.ServiceModel.MessageCategory.Technical, MessageType.Error, "TokenError", response.StatusCode.ToString(), $"{response.StatusCode} occured while requesting a token for {upn}"));
+                return Result.Fail(ValidationError.Create($"{response.StatusCode} occured while requesting a token for {upn}").WithCode("TokenError"));
             }
 
             // at this point, we *must* have a valid Json response. The values are a mixture of strings and numbers, so we deserialize the JsonElements
@@ -197,7 +186,7 @@ public class CredentialTokenProvider : ICredentialTokenProvider
         catch (Exception ex)
         {
             _logger.Technical().Exception(ex).Log();
-            throw new AppException(new Message(Arc4u.ServiceModel.MessageCategory.Technical, MessageType.Error, "Trust", "Rejected", ex.Message));
+            return Result.Fail(ValidationError.Create(ex.Message).WithCode("Rejected"));
         }
     }
 }

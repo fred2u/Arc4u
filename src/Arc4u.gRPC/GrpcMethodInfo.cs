@@ -9,7 +9,7 @@ public class GrpcMethodInfo
 
     public GrpcMethodInfo()
     {
-        RightsOnMethod = new Dictionary<string, ServiceAspectAttribute>();
+        RightsOnMethod = [];
     }
 
     /// <summary>

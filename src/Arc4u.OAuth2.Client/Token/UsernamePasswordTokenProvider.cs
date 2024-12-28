@@ -6,30 +6,18 @@ using Arc4u.Exceptions;
 using Arc4u.Network.Connectivity;
 using Arc4u.OAuth2.Security.Principal;
 using Arc4u.OAuth2.TokenProvider;
-using Arc4u.ServiceModel;
+using FluentResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.OAuth2.Token;
 
 [Export(UsernamePasswordTokenProvider.ProviderName, typeof(ITokenProvider))]
-public class UsernamePasswordTokenProvider : ITokenProvider
+public class UsernamePasswordTokenProvider(ISecureCache secureCache, INetworkInformation networkStatus, ILogger<UsernamePasswordTokenProvider> logger, IServiceProvider container) : ITokenProvider
 {
-    public UsernamePasswordTokenProvider(ISecureCache secureCache, INetworkInformation networkStatus, ILogger<UsernamePasswordTokenProvider> logger, IServiceProvider container)
-    {
-        _secureCache = secureCache;
-        _networkStatus = networkStatus;
-        Container = container;
-        _logger = logger;
-    }
-
     public const string ProviderName = "usernamePassword";
 
-    private readonly ICache _secureCache;
-    private readonly INetworkInformation _networkStatus;
-    private readonly IServiceProvider Container;
-    private readonly ILogger<UsernamePasswordTokenProvider> _logger;
-
+    private readonly ICache _secureCache = secureCache;
     private string userkey = default!;
     private string pwdkey = default!;
     private string serviceId = default!;
@@ -66,7 +54,7 @@ public class UsernamePasswordTokenProvider : ITokenProvider
 
         if (string.IsNullOrWhiteSpace(upn) || string.IsNullOrWhiteSpace(pwd))
         {
-            if (!Container.TryGetService<IUserNamePasswordProvider>(out var usernamePasswordProvider))
+            if (!container.TryGetService<IUserNamePasswordProvider>(out var usernamePasswordProvider))
             {
                 throw new AppException("No Token provider found in the container.");
             }
@@ -88,9 +76,9 @@ public class UsernamePasswordTokenProvider : ITokenProvider
         }
 
         // Check before requesting a token we have a network connectivity!
-        if (_networkStatus.Status == NetworkStatus.None)
+        if (networkStatus.Status == NetworkStatus.None)
         {
-            throw new NetworkException(_networkStatus.Status);
+            throw new NetworkException(networkStatus.Status);
         }
 
         try
@@ -106,7 +94,7 @@ public class UsernamePasswordTokenProvider : ITokenProvider
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
 
             throw;
         }
@@ -115,14 +103,22 @@ public class UsernamePasswordTokenProvider : ITokenProvider
 
     protected async Task<TokenInfo> CreateBasicTokenInfoAsync(IKeyValueSettings settings, CredentialsResult credential)
     {
-        var basicTokenProvider = Container.GetKeyedService<ICredentialTokenProvider>(CredentialTokenProvider.ProviderName);
+        var basicTokenProvider = container.GetKeyedService<ICredentialTokenProvider>(CredentialTokenProvider.ProviderName);
 
         if (null == basicTokenProvider)
         {
             throw new InvalidOperationException("No basic token provider found!");
         }
 
-        return await basicTokenProvider.GetTokenAsync(settings, credential).ConfigureAwait(false);
+        var result = await basicTokenProvider.GetTokenAsync(settings, credential).ConfigureAwait(false);
+
+        if (result.IsFailed)
+        {
+            result.Log();
+            throw new InvalidOperationException("No token received!");
+        }
+
+        return result.Value;
     }
 
     // This method is called by the page receiving the user name and password. To be sure we have a valid one!
@@ -142,12 +138,12 @@ public class UsernamePasswordTokenProvider : ITokenProvider
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
             return false;
         }
     }
 
-    private void GetSettings(IKeyValueSettings settings, out string serviceId, out string authority, out string passwordStoreKey)
+    private static void GetSettings(IKeyValueSettings settings, out string serviceId, out string authority, out string passwordStoreKey)
     {
         // Validate arguments.
         if (!settings.Values.ContainsKey(TokenKeys.AuthorityKey))
@@ -164,20 +160,23 @@ public class UsernamePasswordTokenProvider : ITokenProvider
         authority = settings.Values[TokenKeys.AuthorityKey];
 
         // Check the information.
-        var messages = new Messages();
+        var result = new Result();
 
         if (string.IsNullOrWhiteSpace(serviceId))
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Warning, $"No information from the application settings section about an entry: {TokenKeys.ServiceApplicationIdKey}."));
+            result.WithError($"No information from the application settings section about an entry: {TokenKeys.ServiceApplicationIdKey}.");
         }
 
         if (string.IsNullOrWhiteSpace(authority))
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Warning, $"{TokenKeys.AuthorityKey} is not defined in the configuration file."));
+            result.WithError($"{TokenKeys.AuthorityKey} is not defined in the configuration file.");
         }
 
-        messages.LogAndThrowIfNecessary(_logger);
-        messages.Clear();
+        result.LogIfFailed();
+        if (result.IsFailed)
+        {
+            throw new InvalidOperationException("The settings are not correct!");
+        }
 
         passwordStoreKey = "secret";
         if (settings.Values.ContainsKey(TokenKeys.PasswordStoreKey))
@@ -199,7 +198,7 @@ public class UsernamePasswordTokenProvider : ITokenProvider
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
         }
 
         try
@@ -209,7 +208,7 @@ public class UsernamePasswordTokenProvider : ITokenProvider
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
         }
 
         return ValueTask.CompletedTask;

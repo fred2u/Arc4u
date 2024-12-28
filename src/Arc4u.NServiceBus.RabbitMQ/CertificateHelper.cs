@@ -23,7 +23,7 @@ public static class CertificateHelper
 
         if (null == certificateName)
         {
-            throw new AppException("No CertificateName key found in the settings provided.");
+            throw new InvalidOperationException("No CertificateName key found in the settings provided.");
         }
         else
         {

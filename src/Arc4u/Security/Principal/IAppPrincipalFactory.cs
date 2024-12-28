@@ -1,12 +1,13 @@
-using Arc4u.ServiceModel;
+
+using FluentResults;
 
 namespace Arc4u.Security.Principal;
 
 public interface IAppPrincipalFactory
 {
-    Task<AppPrincipal> CreatePrincipalAsync(Messages messages, object? parameter = null);
-    Task<AppPrincipal> CreatePrincipalAsync(IKeyValueSettings settings, Messages messages, object? parameter = null);
-    Task<AppPrincipal> CreatePrincipalAsync(string settingsResolveName, Messages messages, object? parameter = null);
+    Task<Result<AppPrincipal>> CreatePrincipalAsync(object? parameter = null);
+    Task<Result<AppPrincipal>> CreatePrincipalAsync(IKeyValueSettings settings, object? parameter = null);
+    Task<Result<AppPrincipal>> CreatePrincipalAsync(string settingsResolveName, object? parameter = null);
 
     ValueTask SignOutUserAsync(CancellationToken cancellationToken);
 

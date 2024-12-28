@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Arc4u.Dependency.Attribute;
-using Arc4u.ServiceModel;
+using FluentResults;
 using Google.Rpc;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
@@ -20,8 +20,8 @@ public class ClientErrorInterceptor : Interceptor
 
         if (null != error && rpc.Message.Equals("AppSettings", StringComparison.InvariantCultureIgnoreCase))
         {
-            var messages = JsonSerializer.Deserialize<List<Message>>(error.Reason) ?? [];
-            throw new AppException(messages);
+            var messages = JsonSerializer.Deserialize<string[]>(error.Reason) ?? [];
+            throw new AppException(Result.Fail(messages));
         }
 
         if (StatusCode.PermissionDenied == rpc.StatusCode)

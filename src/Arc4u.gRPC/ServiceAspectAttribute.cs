@@ -17,5 +17,5 @@ public class ServiceAspectAttribute : Attribute
 
     public int[] Operations { get; set; }
 
-    public static ServiceAspectAttribute Empty() => new ServiceAspectAttribute([]);
+    public static ServiceAspectAttribute Empty() => new([]);
 }

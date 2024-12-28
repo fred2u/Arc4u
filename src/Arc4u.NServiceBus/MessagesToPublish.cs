@@ -10,7 +10,7 @@ namespace Arc4u.NServiceBus;
 /// </summary>
 public sealed class MessagesToPublish
 {
-    static readonly AsyncLocal<List<Object>> messages = new AsyncLocal<List<Object>>();
+    static readonly AsyncLocal<List<object>> messages = new();
 
     public static Func<Type, bool> EventsNamingConvention = _ => false;
 
@@ -31,7 +31,7 @@ public sealed class MessagesToPublish
     {
         if (null == EventsNamingConvention || null == CommandsNamingConvention)
         {
-            throw new AppException("No conventions is defined for Commands or Events.");
+            throw new InvalidOperationException("No conventions is defined for Commands or Events.");
         }
 
         if (EventsNamingConvention(message.GetType()) || CommandsNamingConvention(message.GetType()))
@@ -40,7 +40,7 @@ public sealed class MessagesToPublish
         }
         else
         {
-            throw new AppException("Doesn't respect the namespace convention defined for events and commands.");
+            throw new InvalidOperationException("Doesn't respect the namespace convention defined for events and commands.");
         }
     }
 
@@ -52,7 +52,7 @@ public sealed class MessagesToPublish
         messages.Value?.Clear();
     }
 
-    internal static List<Object> Events => messages.Value is null ? [] : messages.Value.Where((m) => EventsNamingConvention(m.GetType())).ToList();
+    internal static List<object> Events => messages.Value is null ? [] : messages.Value.Where((m) => EventsNamingConvention(m.GetType())).ToList();
 
-    internal static List<Object> Commands => messages.Value is null ? [] : messages.Value.Where((m) => CommandsNamingConvention(m.GetType())).ToList();
+    internal static List<object> Commands => messages.Value is null ? [] : messages.Value.Where((m) => CommandsNamingConvention(m.GetType())).ToList();
 }

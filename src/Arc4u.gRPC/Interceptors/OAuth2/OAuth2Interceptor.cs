@@ -45,6 +45,7 @@ public class OAuth2Interceptor : Interceptor
     private readonly ILogger<OAuth2Interceptor> _logger;
     private readonly IScopedServiceProviderAccessor? _serviceProviderAccessor;
     private readonly IServiceProvider? _containerResolve;
+    private static readonly string[] sourceArray = new string[] { "Bearer", "Basic" };
 
     private IServiceProvider? GetResolver() => _containerResolve ?? _serviceProviderAccessor?.ServiceProvider?.GetService<IServiceProvider>();
 
@@ -92,7 +93,7 @@ public class OAuth2Interceptor : Interceptor
         // Need to create a new context with headers for the call.
         if (headers == null)
         {
-            headers = new Metadata();
+            headers = [];
             var options = context.Options.WithHeaders(headers);
             context = new ClientInterceptorContext<TRequest, TResponse>(context.Method, context.Host, options);
         }
@@ -172,7 +173,7 @@ public class OAuth2Interceptor : Interceptor
             var scheme = inject ? tokenInfo.TokenType : "Bearer";
             _logger.Technical().System($"Add the {scheme} token to provide authentication evidence.").Log();
 
-            if (new string[] { "Bearer", "Basic" }.Any(s => s.Equals(scheme, StringComparison.InvariantCultureIgnoreCase)))
+            if (sourceArray.Any(s => s.Equals(scheme, StringComparison.InvariantCultureIgnoreCase)))
             {
                 headers.Add("authorization", $"{scheme} {tokenInfo.Token}");
             }

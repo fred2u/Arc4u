@@ -3,7 +3,6 @@ using System.Security.Claims;
 using Arc4u.Dependency;
 using Arc4u.OAuth2.Token;
 using Arc4u.Security.Principal;
-using Arc4u.ServiceModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
@@ -19,17 +18,14 @@ namespace Arc4u.Blazor;
 [ApiController]
 [Route("[controller]")]
 [ApiExplorerSettings(IgnoreApi = true)]
-[ProducesResponseType(typeof(IEnumerable<Message>), StatusCodes.Status400BadRequest)]
+[ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
 public class BlazorController : ControllerBase
 {
     private const int buffer = 1024;
 
-    public BlazorController(ILogger<BlazorController> logger)
+    public BlazorController()
     {
-        _logger = logger;
     }
-
-    private readonly ILogger<BlazorController> _logger;
 
     /// <summary>
     /// This document will be part of the Sdk!

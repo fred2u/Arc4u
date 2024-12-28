@@ -5,7 +5,7 @@ namespace Arc4u.NServiceBus;
 [Export, Scoped]
 public class MessagesToPublish
 {
-    private readonly List<Object> messages = new List<Object>();
+    private readonly List<object> messages = [];
 
     public static Func<Type, bool> EventsNamingConvention = _ => false;
 
@@ -19,7 +19,7 @@ public class MessagesToPublish
     {
         if (null == EventsNamingConvention || null == CommandsNamingConvention)
         {
-            throw new AppException("No conventions is defined for Commands or Events.");
+            throw new InvalidOperationException("No conventions is defined for Commands or Events.");
         }
 
         if (EventsNamingConvention(message.GetType()) || CommandsNamingConvention(message.GetType()))
@@ -28,7 +28,7 @@ public class MessagesToPublish
         }
         else
         {
-            throw new AppException("Doesn't respect the namespace convention defined for events and commands.");
+            throw new InvalidOperationException("Doesn't respect the namespace convention defined for events and commands.");
         }
     }
 
@@ -40,7 +40,7 @@ public class MessagesToPublish
         messages?.Clear();
     }
 
-    public List<Object> Events => messages.Where((m) => EventsNamingConvention(m.GetType())).ToList();
+    public List<object> Events => messages.Where((m) => EventsNamingConvention(m.GetType())).ToList();
 
-    public List<Object> Commands => messages.Where((m) => CommandsNamingConvention(m.GetType())).ToList();
+    public List<object> Commands => messages.Where((m) => CommandsNamingConvention(m.GetType())).ToList();
 }

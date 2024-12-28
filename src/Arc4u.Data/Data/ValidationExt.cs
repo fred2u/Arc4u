@@ -1,16 +1,18 @@
+using FluentResults;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.Data;
 
 public static class ValidationExtention
 {
-    public static void ValidateAll<T>(this IEnumerable<T> entities, ILogger<T> logger) where T : PersistEntity
+    public static Result ValidateAll<T>(this IEnumerable<T> entities, ILogger<T> logger) where T : PersistEntity
     {
-        var messages = new ServiceModel.Messages();
+        var result = new Result();
         foreach (var entity in entities)
         {
-            messages.AddRange(entity.TryValidate());
+            result.WithReasons(entity.TryValidate().Reasons);
         }
-        messages.LogAndThrowIfNecessary(logger);
+
+        return result;
     }
 }

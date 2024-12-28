@@ -7,7 +7,7 @@ using Arc4u.Dependency.Attribute;
 using Arc4u.Diagnostics;
 using Arc4u.OAuth2.Token;
 using Arc4u.Security.Principal;
-using Arc4u.ServiceModel;
+using FluentResults;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -16,37 +16,25 @@ using Microsoft.Extensions.Options;
 namespace Arc4u.OAuth2.Security.Principal;
 
 [Export(typeof(IAppPrincipalFactory))]
-public class AppServicePrincipalFactory : IAppPrincipalFactory
+public class AppServicePrincipalFactory(IServiceProvider container, ILogger<AppServicePrincipalFactory> logger, IOptionsMonitor<SimpleKeyValueSettings> settings, IClaimsTransformation claimsTransformation, IActivitySourceFactory activitySourceFactory) : IAppPrincipalFactory
 {
     public const string ProviderKey = "ProviderId";
 
     public static readonly string tokenExpirationClaimType = "exp";
-    public static readonly string[] ClaimsToExclude = { "exp", "aud", "iss", "iat", "nbf", "acr", "aio", "appidacr", "ipaddr", "scp", "sub", "tid", "uti", "unique_name", "apptype", "appid", "ver", "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant", "http://schemas.microsoft.com/identity/claims/scope" };
+    public static readonly string[] ClaimsToExclude = ["exp", "aud", "iss", "iat", "nbf", "acr", "aio", "appidacr", "ipaddr", "scp", "sub", "tid", "uti", "unique_name", "apptype", "appid", "ver", "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant", "http://schemas.microsoft.com/identity/claims/scope"];
+    private readonly IOptionsMonitor<SimpleKeyValueSettings> _settings = settings;
+    private readonly ActivitySource? _activitySource = activitySourceFactory.GetArc4u();
 
-    private readonly IServiceProvider _container;
-    private readonly ILogger<AppServicePrincipalFactory> _logger;
-    private readonly IOptionsMonitor<SimpleKeyValueSettings> _settings;
-    private readonly IClaimsTransformation _claimsTransformation;
-    private readonly ActivitySource? _activitySource;
-
-    public Task<AppPrincipal> CreatePrincipalAsync(Messages messages, object? parameter)
+    public Task<Result<AppPrincipal>> CreatePrincipalAsync(object? parameter = null)
     {
         throw new NotImplementedException();
     }
 
-    public AppServicePrincipalFactory(IServiceProvider container, ILogger<AppServicePrincipalFactory> logger, IOptionsMonitor<SimpleKeyValueSettings> settings, IClaimsTransformation claimsTransformation, IActivitySourceFactory activitySourceFactory)
-    {
-        _container = container;
-        _logger = logger;
-        _settings = settings;
-        _claimsTransformation = claimsTransformation;
-        _activitySource = activitySourceFactory.GetArc4u();
-    }
-
-    public async Task<AppPrincipal> CreatePrincipalAsync(string settingsResolveName, Messages messages, object? parameter)
+    public async Task<Result<AppPrincipal>> CreatePrincipalAsync(string settingsResolveName, object? parameter)
     {
         var settings = _settings.Get(settingsResolveName);
-        return await CreatePrincipalAsync(settings, messages, parameter).ConfigureAwait(false);
+
+        return await CreatePrincipalAsync(settings, parameter).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -57,35 +45,37 @@ public class AppServicePrincipalFactory : IAppPrincipalFactory
     /// <param name="parameter">unused.</param>
     /// <returns></returns>
     /// <exception cref="AppPrincipalException">Thrown when a principal cannot be created.</exception>
-    public async Task<AppPrincipal> CreatePrincipalAsync(IKeyValueSettings settings, Messages messages, object? parameter = null)
+    public async Task<Result<AppPrincipal>> CreatePrincipalAsync(IKeyValueSettings settings, object? parameter = null)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentNullException.ThrowIfNull(messages);
+
+        var result = new Result<AppPrincipal>();
 
         using var activity = _activitySource?.StartActivity("Prepare the creation of the Arc4u Principal", ActivityKind.Producer);
 
         var identity = new ClaimsIdentity("OAuth2Bearer", "upn", ClaimsIdentity.DefaultRoleClaimType);
 
-        await BuildTheIdentity(identity, settings, parameter).ConfigureAwait(false);
+        var identityResult = await BuildTheIdentityAsync(identity, settings, parameter).ConfigureAwait(false);
+        result.WithReasons(identityResult.Reasons);
 
-        var principal = await _claimsTransformation.TransformAsync(new ClaimsPrincipal(identity)).ConfigureAwait(false);
+        var principal = await claimsTransformation.TransformAsync(new ClaimsPrincipal(identity)).ConfigureAwait(false);
 
         if (principal is AppPrincipal appPrincipal)
         {
             activity?.SetTag(LoggingConstants.ActivityId, Activity.Current?.Id ?? Guid.NewGuid().ToString());
-            return appPrincipal;
+            result.WithValue(appPrincipal);
+            return result;
         }
 
-        throw new AppPrincipalException("No principal can be created.");
-
+        return result.WithError("No principal can be created.");
     }
 
-    private async Task BuildTheIdentity(ClaimsIdentity identity, IKeyValueSettings settings, object? parameter = null)
+    private async Task<Result> BuildTheIdentityAsync(ClaimsIdentity identity, IKeyValueSettings settings, object? parameter = null)
     {
         // Check if we have a provider registered.
-        if (!_container.TryGetService(settings.Values[ProviderKey], out ITokenProvider? provider))
+        if (!container.TryGetService(settings.Values[ProviderKey], out ITokenProvider? provider))
         {
-            throw new NotSupportedException($"The principal cannot be created. We are missing an account provider: {settings.Values[ProviderKey]}");
+            return Result.Fail(new ExceptionalError(new NotSupportedException($"The principal cannot be created. We are missing an account provider: {settings.Values[ProviderKey]}")));
         }
 
         // Check the settings contains the service url.
@@ -95,7 +85,7 @@ public class AppServicePrincipalFactory : IAppPrincipalFactory
             token = await provider!.GetTokenAsync(settings, parameter).ConfigureAwait(true);
             if (null == token)
             {
-                throw new InvalidOperationException("The token is null.");
+                return Result.Fail("The token is null.");
             }
             identity.BootstrapContext = token.Token;
             var jwtToken = new JwtSecurityToken(token.Token);
@@ -103,18 +93,20 @@ public class AppServicePrincipalFactory : IAppPrincipalFactory
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            return Result.Fail(new ExceptionalError(ex));
         }
+
+        return Result.Ok();
     }
 
     private async ValueTask RemoveCacheFromUserAsync()
     {
-        if (_container.TryGetService<IApplicationContext>(out var appContext))
+        if (container.TryGetService<IApplicationContext>(out var appContext))
         {
             if (appContext!.Principal is not null && appContext.Principal.Identity is not null && appContext.Principal.Identity is ClaimsIdentity claimsIdentity)
             {
-                var cacheHelper = _container.GetService<ICacheHelper>();
-                var cacheKeyGenerator = _container.GetService<ICacheKeyGenerator>();
+                var cacheHelper = container.GetService<ICacheHelper>();
+                var cacheKeyGenerator = container.GetService<ICacheKeyGenerator>();
 
                 if (null != cacheHelper && null != cacheKeyGenerator)
                 {
@@ -123,10 +115,11 @@ public class AppServicePrincipalFactory : IAppPrincipalFactory
             }
             else
             {
-                _logger.Technical().LogError("No principal exists on the current context.");
+                logger.Technical().LogError("No principal exists on the current context.");
             }
         }
     }
+
     public async ValueTask SignOutUserAsync(CancellationToken cancellationToken)
     {
         await RemoveCacheFromUserAsync().ConfigureAwait(false);

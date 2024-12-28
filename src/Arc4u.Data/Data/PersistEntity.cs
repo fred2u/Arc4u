@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Runtime.Serialization;
-using Arc4u.ServiceModel;
+using FluentResults;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.Data;
@@ -145,21 +145,21 @@ public abstract class PersistEntity : NotifyEntity, IPersistEntity
         _persistChange = entity._persistChange;
     }
 
-    public Messages TryValidate()
+    public Result TryValidate()
     {
-        var messages = new Messages();
+        var result = new Result();
         var results = new List<ValidationResult>();
         var context = new ValidationContext(this);
         if (!Validator.TryValidateObject(this, context, results, true))
         {
             results.ForEach(
-                r => messages.Add(new Message(ServiceModel.MessageCategory.Business, ServiceModel.MessageType.Error, r.ErrorMessage ?? "Empty error message!")));
+                r => result.WithError(r.ErrorMessage ?? "Empty error message!"));
         }
-        return messages;
+        return result;
     }
 
     public void Validate<T>(ILogger<T> logger)
     {
-        TryValidate().LogAndThrowIfNecessary(logger);
+        TryValidate().LogIfFailed();
     }
 }

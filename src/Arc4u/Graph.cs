@@ -284,7 +284,7 @@ public class Graph<T> where T : class
 
         if (stringPath.Contains('.'))
         {
-            throw new AppException(OnlyLevelOneIsAllowed);
+            throw new InvalidOperationException(OnlyLevelOneIsAllowed);
         }
 
         var q = (from s in _includes

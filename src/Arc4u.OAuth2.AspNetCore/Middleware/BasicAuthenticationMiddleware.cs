@@ -116,7 +116,16 @@ public class BasicAuthenticationMiddleware
             }
 
             // Get an Access Token.
-            return await provider.GetTokenAsync(_options.BasicSettings, credential).ConfigureAwait(false);
+            var result = await provider.GetTokenAsync(_options.BasicSettings, credential).ConfigureAwait(false);
+
+            if (result.IsFailed)
+            {
+                _logger.Technical().LogError($"No token has been created for the user {credential.Upn}.");
+                result.Log();
+                return null;
+            }
+
+            return result.Value;
         }
 
         return null;
@@ -133,7 +142,7 @@ public class BasicAuthenticationMiddleware
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (!_options.CertificateHeaderOptions.Any())
+        if (_options.CertificateHeaderOptions.Count == 0)
         {
             return new CredentialsResult(false);
         }

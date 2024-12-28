@@ -17,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Arc4u.Caching\Arc4u.Caching.csproj" />
+    <ProjectReference Include="..\Arc4u.Results\Arc4u.Results.csproj" />
     <ProjectReference Include="..\Arc4u\Arc4u.csproj" />
   </ItemGroup>
 </Project>

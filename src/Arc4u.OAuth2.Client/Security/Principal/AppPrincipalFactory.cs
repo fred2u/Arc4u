@@ -8,97 +8,98 @@ using Arc4u.Diagnostics;
 using Arc4u.IdentityModel.Claims;
 using Arc4u.Network.Connectivity;
 using Arc4u.OAuth2.Token;
+using Arc4u.Results.Validation;
 using Arc4u.Security.Principal;
-using Arc4u.ServiceModel;
+using FluentResults;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.OAuth2.Client.Security.Principal;
 
 [Export(typeof(IAppPrincipalFactory))]
-public class AppPrincipalFactory : IAppPrincipalFactory
+public class AppPrincipalFactory(IServiceProvider container, INetworkInformation networkInformation, ISecureCache claimsCache, ICacheKeyGenerator cacheKeyGenerator, IApplicationContext applicationContext, ILogger<AppPrincipalFactory> logger) : IAppPrincipalFactory
 {
     public const string ProviderKey = "ProviderId";
     public const string DefaultSettingsResolveName = "OAuth2";
     public const string PlatformParameters = "platformParameters";
 
     public static readonly string tokenExpirationClaimType = "exp";
-    public static readonly string[] ClaimsToExclude = { "exp", "aud", "iss", "iat", "nbf", "acr", "aio", "appidacr", "ipaddr", "scp", "sub", "tid", "uti", "unique_name", "apptype", "appid", "ver", "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant", "http://schemas.microsoft.com/identity/claims/scope" };
+    public static readonly string[] ClaimsToExclude = ["exp", "aud", "iss", "iat", "nbf", "acr", "aio", "appidacr", "ipaddr", "scp", "sub", "tid", "uti", "unique_name", "apptype", "appid", "ver", "http://schemas.microsoft.com/ws/2008/06/identity/claims/authenticationinstant", "http://schemas.microsoft.com/identity/claims/scope"];
+    private readonly ICache _claimsCache = claimsCache;
 
-    private readonly IServiceProvider _container;
-    private readonly INetworkInformation _networkInformation;
-    private readonly ICache _claimsCache;
-    private readonly ICacheKeyGenerator _cacheKeyGenerator;
-    private readonly IApplicationContext _applicationContext;
-    private readonly ILogger<AppPrincipalFactory> _logger;
-
-    public AppPrincipalFactory(IServiceProvider container, INetworkInformation networkInformation, ISecureCache claimsCache, ICacheKeyGenerator cacheKeyGenerator, IApplicationContext applicationContext, ILogger<AppPrincipalFactory> logger)
+    public async Task<Result<AppPrincipal>> CreatePrincipalAsync(object? parameter = null)
     {
-        _container = container;
-        _networkInformation = networkInformation;
-        _claimsCache = claimsCache;
-        _cacheKeyGenerator = cacheKeyGenerator;
-        _applicationContext = applicationContext;
-        _logger = logger;
+        return await CreatePrincipalAsync(DefaultSettingsResolveName, parameter).ConfigureAwait(true);
     }
 
-    public async Task<AppPrincipal> CreatePrincipalAsync(Messages messages, object? parameter = null)
+    public async Task<Result<AppPrincipal>> CreatePrincipalAsync(string settingsResolveName, object? parameter = null)
     {
-        return await CreatePrincipalAsync(DefaultSettingsResolveName, messages, parameter).ConfigureAwait(true);
-    }
-
-    public async Task<AppPrincipal> CreatePrincipalAsync(string settingsResolveName, Messages messages, object? parameter = null)
-    {
-        var settings = _container.GetKeyedService<IKeyValueSettings>(settingsResolveName);
+        var settings = container.GetKeyedService<IKeyValueSettings>(settingsResolveName);
 
         if (settings == null)
         {
-            throw new InvalidOperationException($"No section {settingsResolveName} was found.");
+            return Result.Fail($"No section {settingsResolveName} was found.");
         }
-        return await CreatePrincipalAsync(settings, messages, parameter).ConfigureAwait(false);
+
+        return await CreatePrincipalAsync(settings, parameter).ConfigureAwait(false);
     }
 
-    public async Task<AppPrincipal> CreatePrincipalAsync(IKeyValueSettings settings, Messages messages, object? parameter = null)
+    public async Task<Result<AppPrincipal>> CreatePrincipalAsync(IKeyValueSettings settings, object? parameter = null)
     {
+        var result = new Result<AppPrincipal>();
         var identity = new ClaimsIdentity("OAuth2Bearer", System.Security.Claims.ClaimTypes.Upn, ClaimsIdentity.DefaultRoleClaimType);
 
         ArgumentNullException.ThrowIfNull(settings);
-        ArgumentNullException.ThrowIfNull(messages);
 
         // when we have no internet connectivity may be we have claims in cache.
-        if (NetworkStatus.None == _networkInformation.Status)
+        if (NetworkStatus.None == networkInformation.Status)
         {
             // In a scenario where the claims cached are always for one user like a UI, the identity is not used => so retrieving the claims in the cache is possible!
             var emptyIdentity = new ClaimsIdentity();
             var cachedClaims = GetClaimsFromCache(emptyIdentity);
             identity.AddClaims(cachedClaims.Select(p => new Claim(p.ClaimType, p.Value)));
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Information, "Create the principal from the cache due to no network connectivity."));
+            result.WithSuccess("Create the principal from the cache due to no network connectivity.");
         }
         else
         {
-            await BuildTheIdentityAsync(identity, settings, messages, parameter).ConfigureAwait(false);
+            var IdentityResult = await BuildTheIdentityAsync(identity, settings, parameter).ConfigureAwait(false);
+            result.WithReasons(IdentityResult.Reasons);
         }
 
-        var authorization = BuildAuthorization(identity, messages);
-        var profile = BuildProfile(identity, messages);
-
-        var principal = new AppPrincipal(authorization, identity, "S-1-0-0")
+        if (result.IsFailed)
         {
-            Profile = profile
-        };
-        _applicationContext.SetPrincipal(principal);
+            return result;
+        }
 
-        return principal;
+        var authorizationResult = BuildAuthorization(identity);
+        var profileResult = BuildProfile(identity);
+
+        result.WithReasons(authorizationResult.Reasons).WithReasons(profileResult.Reasons);
+
+        if (result.IsFailed)
+        {
+            return result;
+        }
+
+        var principal = new AppPrincipal(authorizationResult.Value, identity, "S-1-0-0")
+        {
+            Profile = profileResult.Value
+        };
+
+        applicationContext.SetPrincipal(principal);
+
+        return result.WithValue(principal);
     }
 
-    private async Task BuildTheIdentityAsync(ClaimsIdentity identity, IKeyValueSettings settings, Messages messages, object? parameter = null)
+    private async Task<Result> BuildTheIdentityAsync(ClaimsIdentity identity, IKeyValueSettings settings, object? parameter = null)
     {
         // Check if we have a provider registered.
-        if (!_container.TryGetService(settings.Values[ProviderKey], out ITokenProvider? provider))
+        if (!container.TryGetService(settings.Values[ProviderKey], out ITokenProvider? provider))
         {
-            throw new NotSupportedException($"The principal cannot be created. We are missing an account provider: {settings.Values[ProviderKey]}");
+            return Result.Fail($"The principal cannot be created. We are missing an account provider: {settings.Values[ProviderKey]}");
         }
 
+        var result = new Result();
         // Check the settings contains the service url.
         TokenInfo? token = null;
         try
@@ -107,7 +108,7 @@ public class AppPrincipalFactory : IAppPrincipalFactory
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
         }
 
         if (null != token)
@@ -145,7 +146,7 @@ public class AppPrincipalFactory : IAppPrincipalFactory
             if (copyClaimsFromCache)
             {
                 identity.AddClaims(cachedClaims.Select(p => new Claim(p.ClaimType, p.Value)));
-                messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Information, "Create the principal from the cache, token has not been refreshed."));
+                result.WithSuccess("Create the principal from the cache, token has not been refreshed.");
             }
             else
             {
@@ -156,23 +157,23 @@ public class AppPrincipalFactory : IAppPrincipalFactory
                     identity.AddClaim(expTokenClaim);
                 }
 
-                if (_container.TryGetService(out IClaimsFiller? claimFiller)) // Fill the claims with more information.
+                if (container.TryGetService(out IClaimsFiller? claimFiller)) // Fill the claims with more information.
                 {
                     try
                     {
                         // Get the claims and clean any technical claims in case of.
-                        var claims = (await claimFiller!.GetAsync(identity, new List<IKeyValueSettings> { settings }, parameter).ConfigureAwait(false))
+                        var claims = (await claimFiller!.GetAsync(identity, [settings], parameter).ConfigureAwait(false))
                                         .Where(c => !ClaimsToExclude.Any(arg => arg.Equals(c.ClaimType))).ToList();
 
                         // We copy the claims from the backend but the exp claim will be the value of the token (front end definition) and not the backend one. Otherwhise there will be always a difference.
                         identity.AddClaims(claims.Where(c => !identity.Claims.Any(c1 => c1.Type == c.ClaimType)).Select(c => new Claim(c.ClaimType, c.Value)));
 
-                        messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Information, $"Add {claims.Count} claims to the principal."));
-                        messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Information, $"Save claims to the cache."));
+                        result.WithSuccess($"Add {claims.Count} claims to the principal.");
+                        result.WithSuccess($"Save claims to the cache.");
                     }
                     catch (Exception e)
                     {
-                        messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Error, e.ToString()));
+                        result.WithError(new ExceptionalError(e));
                     }
                 }
 
@@ -181,8 +182,10 @@ public class AppPrincipalFactory : IAppPrincipalFactory
         }
         else
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Warning, "The call to identify the user has failed. Token is null!"));
+            result.WithError("The call to identify the user has failed. Token is null!");
         }
+
+        return result;
     }
 
     /// <summary>
@@ -190,50 +193,46 @@ public class AppPrincipalFactory : IAppPrincipalFactory
     /// The provider id is the string used by the Composition library to register the type and not the provider Id used by the token provider itself (Microsoft, google, or other...).
     /// Today only the connected scenario is covered!
     /// </summary>
-    private Authorization BuildAuthorization(ClaimsIdentity identity, Messages messages)
+    private Result<Authorization> BuildAuthorization(ClaimsIdentity identity)
     {
-        var authorization = new Authorization();
+        var result = new Result<Authorization>();
         // We need to fill the authorization and user profile from the provider!
-        if (_container.TryGetService(out IClaimAuthorizationFiller? claimAuthorizationFiller))
+        if (container.TryGetService(out IClaimAuthorizationFiller? claimAuthorizationFiller))
         {
-            authorization = claimAuthorizationFiller!.GetAuthorization(identity);
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Information, $"Fill the authorization information to the principal."));
+            var authorization = claimAuthorizationFiller!.GetAuthorization(identity);
+            result = Result.Ok(authorization).WithSuccess("Fill the authorization information to the principal.");
         }
         else
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Warning, $"No class waw found to fill the authorization to the principal."));
+            result.WithError(ValidationError.Create("No class was found to fill the authorization to the principal.").WithSeverity(FluentValidation.Severity.Warning));
         }
 
-        return authorization;
+        return result;
     }
 
-    private UserProfile BuildProfile(ClaimsIdentity identity, Messages messages)
+    private Result<UserProfile> BuildProfile(ClaimsIdentity identity)
     {
-        var profile = UserProfile.Empty;
-        if (_container.TryGetService(out IClaimProfileFiller? profileFiller))
+        if (container.TryGetService(out IClaimProfileFiller? profileFiller))
         {
-            profile = profileFiller!.GetProfile(identity);
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Information, $"Fill the profile information to the principal."));
+            var profile = profileFiller!.GetProfile(identity);
+            return Result.Ok(profile).WithSuccess("Fill the profile information to the principal.");
         }
         else
         {
-            messages.Add(new Message(ServiceModel.MessageCategory.Technical, MessageType.Warning, $"No class was found to fill the principal profile."));
+            return Result.Fail(ValidationError.Create("No class was found to fill the principal profile.").WithSeverity(FluentValidation.Severity.Warning));
         }
-
-        return profile;
     }
 
-    // must be refactored => Take this based on a strategy based on the .Net code.
     private List<ClaimDto> GetClaimsFromCache(ClaimsIdentity identity)
     {
         try
         {
-            var secureClaims = _claimsCache.Get<List<ClaimDto>>(_cacheKeyGenerator.GetClaimsKey(identity));
-            return secureClaims ?? new List<ClaimDto>();
+            var secureClaims = _claimsCache.Get<List<ClaimDto>>(cacheKeyGenerator.GetClaimsKey(identity));
+            return secureClaims ?? [];
         }
         catch (Exception)
         {
-            return new List<ClaimDto>();
+            return [];
         }
     }
 
@@ -243,11 +242,11 @@ public class AppPrincipalFactory : IAppPrincipalFactory
 
         try
         {
-            _claimsCache.Put(_cacheKeyGenerator.GetClaimsKey(identity), claimsDto);
+            _claimsCache.Put(cacheKeyGenerator.GetClaimsKey(identity), claimsDto);
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
         }
     }
 
@@ -257,17 +256,17 @@ public class AppPrincipalFactory : IAppPrincipalFactory
         {
             // In a scenario where the claims cached are always for one user like a UI, the identity is not used
             var emptyIdentity = new ClaimsIdentity();
-            _claimsCache.Remove(_cacheKeyGenerator.GetClaimsKey(emptyIdentity));
+            _claimsCache.Remove(cacheKeyGenerator.GetClaimsKey(emptyIdentity));
         }
         catch (Exception ex)
         {
-            _logger.Technical().LogException(ex);
+            logger.Technical().LogException(ex);
         }
     }
 
     public ValueTask SignOutUserAsync(CancellationToken cancellationToken)
     {
-        var settings = _container.GetKeyedService<IKeyValueSettings>(DefaultSettingsResolveName);
+        var settings = container.GetKeyedService<IKeyValueSettings>(DefaultSettingsResolveName);
 
         if (null == settings)
         {
@@ -280,7 +279,7 @@ public class AppPrincipalFactory : IAppPrincipalFactory
     public async ValueTask SignOutUserAsync(IKeyValueSettings settings, CancellationToken cancellationToken)
     {
         RemoveClaimsCache();
-        if (_container.TryGetService(settings.Values[ProviderKey], out ITokenProvider? provider))
+        if (container.TryGetService(settings.Values[ProviderKey], out ITokenProvider? provider))
         {
             await provider!.SignOutAsync(settings, cancellationToken).ConfigureAwait(false);
         }
