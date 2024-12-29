@@ -3,20 +3,14 @@ using System.Security.Claims;
 using Arc4u.Dependency.Attribute;
 using Arc4u.OAuth2.Token;
 using Arc4u.Security.Principal;
+using FluentResults;
 
 namespace Arc4u.OAuth2.TokenProviders;
 
 [Export(BootstrapContextTokenProvider.ProviderName, typeof(ITokenProvider))]
-public class BootstrapContextTokenProvider : ITokenProvider
+public class BootstrapContextTokenProvider(IApplicationContext applicationContext) : ITokenProvider
 {
     public const string ProviderName = "Bootstrap";
-
-    public BootstrapContextTokenProvider(IApplicationContext applicationContext)
-    {
-        _applicationContext = applicationContext;
-    }
-
-    private readonly IApplicationContext _applicationContext;
 
     /// <summary>
     /// 
@@ -27,13 +21,13 @@ public class BootstrapContextTokenProvider : ITokenProvider
     /// <exception cref="ArgumentException" />
     /// <exception cref="TimeoutException" />
     /// <returns><see cref="TokenInfo"/></returns>
-    public Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
+    public Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        ArgumentNullException.ThrowIfNull(_applicationContext.Principal);
+        ArgumentNullException.ThrowIfNull(applicationContext.Principal);
 
-        if (_applicationContext.Principal.Identity is ClaimsIdentity identity && !string.IsNullOrWhiteSpace(identity?.BootstrapContext?.ToString()))
+        if (applicationContext.Principal.Identity is ClaimsIdentity identity && !string.IsNullOrWhiteSpace(identity?.BootstrapContext?.ToString()))
         {
             var token = identity.BootstrapContext.ToString();
 
@@ -41,13 +35,13 @@ public class BootstrapContextTokenProvider : ITokenProvider
 
             if (jwt.ValidTo > DateTime.UtcNow)
             {
-                return Task.FromResult<TokenInfo?>(new TokenInfo("Bearer", token!, jwt.ValidTo));
+                return Task.FromResult(new TokenInfo("Bearer", token!, jwt.ValidTo).ToResult());
             }
 
-            throw new TimeoutException("The token provided is expired.");
+            return Task.FromResult<Result<TokenInfo>>(Result.Fail("The token provided is expired."));
         }
 
-        throw new AppPrincipalException("No Access token stored in the Identity.");
+        return Task.FromResult<Result<TokenInfo>>(Result.Fail("No Access token stored in the Identity."));
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using Arc4u.Dependency.Attribute;
 using Arc4u.Diagnostics;
+using FluentResults;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.OAuth2.Token;
@@ -16,10 +17,10 @@ public class NullTokenProvider : ITokenProvider
 
     private readonly ILogger<NullTokenProvider> _logger;
 
-    public Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
+    public Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
     {
         _logger.Technical().System("Null token provide is invoked.").Log();
-        return Task.FromResult<TokenInfo?>(null);
+        return Task.FromResult<Result<TokenInfo>>(new());
     }
 
     public ValueTask SignOutAsync(IKeyValueSettings settings, CancellationToken cancellationToken)

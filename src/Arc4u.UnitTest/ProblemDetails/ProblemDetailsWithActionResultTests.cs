@@ -1,6 +1,6 @@
 using Arc4u.AspNetCore.Results;
 using Arc4u.Results;
-using Arc4u.Results.Validation;
+using Arc4u.Validation;
 using AutoFixture;
 using AutoFixture.AutoMoq;
 using FluentAssertions;
@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Severity = FluentValidation.Severity;
 
 namespace Arc4u.UnitTest.ProblemDetail;
 

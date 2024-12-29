@@ -79,16 +79,17 @@ public class AppServicePrincipalFactory(IServiceProvider container, ILogger<AppS
         }
 
         // Check the settings contains the service url.
-        TokenInfo? token = null;
+        Result<TokenInfo> result = new();
         try
         {
-            token = await provider!.GetTokenAsync(settings, parameter).ConfigureAwait(true);
-            if (null == token)
+            result = await provider!.GetTokenAsync(settings, parameter).ConfigureAwait(true);
+
+            if (result.IsFailed)
             {
                 return Result.Fail("The token is null.");
             }
-            identity.BootstrapContext = token.Token;
-            var jwtToken = new JwtSecurityToken(token.Token);
+            identity.BootstrapContext = result.Value.Token;
+            var jwtToken = new JwtSecurityToken(result.Value.Token);
             identity.AddClaims(jwtToken.Claims.Where(c => !ClaimsToExclude.Any(arg => arg.Equals(c.Type))).Select(c => new Claim(c.Type, c.Value)));
         }
         catch (Exception ex)

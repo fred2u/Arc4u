@@ -103,12 +103,12 @@ public class JwtHttpHandler : DelegatingHandler
         }
 
         _logger.Technical().System("Requesting an authentication token.").Log();
-        var tokenInfo = await provider.GetTokenAsync(_settings, null).ConfigureAwait(false);
+        var tokenInfoResult = await provider.GetTokenAsync(_settings, null).ConfigureAwait(false);
 
         // check if the token is still valid.
         // This is due to gRPC. It is possible that a gRPC streaming call is not closed and the token in the HttpContext is expired.
         // It is also possible this with OAuth where the token is added to the Identity and used like this => no refresh of the token is possible.
-        if (null == tokenInfo || tokenInfo.ExpiresOnUtc < DateTime.UtcNow)
+        if (tokenInfoResult.IsFailed || (tokenInfoResult.IsSuccess && tokenInfoResult.Value.ExpiresOnUtc < DateTime.UtcNow))
         {
             _logger.Technical().System($"Token is expired! Next Hanlder will be called.").Log();
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -116,6 +116,8 @@ public class JwtHttpHandler : DelegatingHandler
 
         _logger.Technical().System("Remove any Bearer token attached.").Log();
         request.Headers.Remove("Bearer");
+
+        var tokenInfo = tokenInfoResult.Value;
 
         var scheme = inject ? tokenInfo.TokenType : "Bearer";
         _logger.Technical().System($"Add the {scheme} token to provide authentication evidence.").Log();

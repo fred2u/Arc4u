@@ -4,6 +4,7 @@ using Arc4u.Dependency.Attribute;
 using Arc4u.Diagnostics;
 using Arc4u.OAuth2.Token;
 using Arc4u.Security.Principal;
+using FluentResults;
 using Microsoft.Extensions.Logging;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensibility;
@@ -26,7 +27,7 @@ public class MsalTokenProvider : ITokenProvider
     private readonly IApplicationContext _applicationContext;
     private readonly ILogger<MsalTokenProvider> _logger;
 
-    public async Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
+    public async Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -42,27 +43,27 @@ public class MsalTokenProvider : ITokenProvider
 
                 if (jwt.ValidTo > DateTime.UtcNow)
                 {
-                    return new TokenInfo("Bearer", token!, jwt.ValidTo);
+                    return Result.Ok(new TokenInfo("Bearer", token!, jwt.ValidTo));
                 }
             }
         }
 
         if (null == _publicClientApplication)
         {
-            return null;
+            return Result.Fail("No public client defined.");
         }
 
         var accounts = await _publicClientApplication.PublicClient.GetAccountsAsync().ConfigureAwait(false);
         var firstAccount = accounts.FirstOrDefault();
 
-        var scopes = settings.Values[TokenKeys.Scopes].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+        var scopes = settings.Values[TokenKeys.Scopes].Split([','], StringSplitOptions.RemoveEmptyEntries);
         AuthenticationResult authResult;
         try
         {
             authResult = await _publicClientApplication.PublicClient.AcquireTokenSilent(scopes, firstAccount).ExecuteAsync().ConfigureAwait(false);
 
             JwtSecurityToken jwt = new(authResult.AccessToken);
-            return new TokenInfo("Bearer", authResult.AccessToken, jwt.ValidTo);
+            return Result.Ok(new TokenInfo("Bearer", authResult.AccessToken, jwt.ValidTo));
         }
         catch (MsalUiRequiredException ex)
         {
@@ -85,19 +86,17 @@ public class MsalTokenProvider : ITokenProvider
                 authResult = await builder.ExecuteAsync().ConfigureAwait(false);
 
                 JwtSecurityToken jwt = new(authResult.AccessToken);
-                return new TokenInfo("Bearer", authResult.AccessToken, jwt.ValidTo);
+                return Result.Ok(new TokenInfo("Bearer", authResult.AccessToken, jwt.ValidTo));
             }
             catch (MsalException msalex)
             {
-                _logger.Technical().Exception(msalex).Log();
+                return new ExceptionalError(msalex);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            return new ExceptionalError(ex);
         }
-
-        return null;
     }
 
     public async ValueTask SignOutAsync(IKeyValueSettings settings, CancellationToken cancellationToken)

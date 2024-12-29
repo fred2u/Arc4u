@@ -64,9 +64,12 @@ public class BlazorTokenProviderTests
         var sut = fixture.Create<BlazorTokenProvider>();
 
         // act
-        var token = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
+        var tokenResult = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
 
         // assert
+        tokenResult.Should().NotBeNull();
+        tokenResult.IsSuccess.Should().BeTrue();
+        var token = tokenResult.Value;
         token.Should().NotBeNull();
         token!.Token.Should().Be(accessToken);
 
@@ -105,9 +108,12 @@ public class BlazorTokenProviderTests
         var sut = fixture.Create<BlazorTokenProvider>();
 
         // act
-        var token = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
+        var tokenResult = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
 
         // assert
+        tokenResult.Should().NotBeNull();
+        tokenResult.IsSuccess.Should().BeTrue();
+        var token = tokenResult.Value;
         token.Should().NotBeNull();
         token!.Token.Should().Be(accessToken);
 
@@ -145,9 +151,12 @@ public class BlazorTokenProviderTests
         var sut = fixture.Create<BlazorTokenProvider>();
 
         // act
-        var token = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
+        var tokenResult = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
 
         // assert
+        tokenResult.Should().NotBeNull();
+        tokenResult.IsSuccess.Should().BeTrue();
+        var token = tokenResult.Value;
         token.Should().NotBeNull();
         token!.Token.Should().Be(accessToken);
 
@@ -185,9 +194,12 @@ public class BlazorTokenProviderTests
         var sut = fixture.Create<BlazorTokenProvider>();
 
         // act
-        var token = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
+        var tokenResult = await sut.GetTokenAsync(mockKeyValueSettings.Object, null);
 
         // assert
+        tokenResult.Should().NotBeNull();
+        tokenResult.IsSuccess.Should().BeTrue();
+        var token = tokenResult.Value;
         token.Should().NotBeNull();
         token!.Token.Should().Be(accessToken);
 

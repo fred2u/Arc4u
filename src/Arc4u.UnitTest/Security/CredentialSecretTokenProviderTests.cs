@@ -66,9 +66,12 @@ public class CredentialSecretTokenProviderTests
         // act.
         var sut = _fixture.Create<CredentialSecretTokenProvider>();
 
-        var token = await sut.GetTokenAsync(settings, null);
+        var tokenResult = await sut.GetTokenAsync(settings, null);
 
         // assert.
+        tokenResult.Should().NotBeNull();
+        tokenResult.IsSuccess.Should().BeTrue();
+        var token = tokenResult.Value;
         token.Should().NotBeNull();
         token!.Token.Should().Be(tokenTest.Token);
         token.TokenType.Should().Be(tokenTest.TokenType);
@@ -95,11 +98,12 @@ public class CredentialSecretTokenProviderTests
         // act.
         var sut = _fixture.Create<CredentialSecretTokenProvider>();
 
-        var exception = await Record.ExceptionAsync(async () => await sut.GetTokenAsync(settings, null).ConfigureAwait(false));
+        var result = await sut.GetTokenAsync(settings, null);
 
         // assert.
-        exception.Should().NotBeNull();
-        exception.Should().BeOfType<ConfigurationException>();
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Count.Should().Be(1);
+        result.Errors[0].Message.Should().Be("User/Password or Credential must be filled in.");
         mockCredentialTokenProvider.Verify(m => m.GetTokenAsync(It.IsAny<SimpleKeyValueSettings>(), It.IsAny<CredentialsResult>()), Times.Never);
 
     }

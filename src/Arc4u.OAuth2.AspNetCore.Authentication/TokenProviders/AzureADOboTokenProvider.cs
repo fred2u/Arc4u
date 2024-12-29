@@ -7,6 +7,7 @@ using Arc4u.Diagnostics;
 using Arc4u.OAuth2.Options;
 using Arc4u.OAuth2.Token;
 using Arc4u.Security.Principal;
+using FluentResults;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -42,13 +43,13 @@ public class AzureADOboTokenProvider : ITokenProvider
     private readonly AuthorityOptions _defaultAuthority;
     private readonly IApplicationContext _applicationContext;
 
-    public async Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? _)
+    public async Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? _)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
         if (_applicationContext.Principal is null)
         {
-            throw new InvalidOperationException("No principal exists.");
+            return new Error("No principal exists.");
         }
         using var activity = _activitySource?.StartActivity("Get on behal of token", ActivityKind.Producer);
 
@@ -61,10 +62,10 @@ public class AzureADOboTokenProvider : ITokenProvider
             // this should never happend!
             if (identity is null)
             {
-                throw new NullReferenceException(nameof(identity));
+                return new Error("The identity given is null.");
             }
 
-            throw new NullReferenceException($"Token cannot be retrieved for the AuthenticationType: {identity.AuthenticationType}");
+            return new Error($"Token cannot be retrieved for the AuthenticationType: {identity.AuthenticationType}");
         }
 
         var cache = _cacheHelper.GetCache();
@@ -142,10 +143,10 @@ public class AzureADOboTokenProvider : ITokenProvider
             if (oboToken is null)
             {
                 _logger.Technical().LogError("No token was in the paylod of the message during the Obo request.");
-                throw new NullReferenceException(nameof(oboToken));
+                return new Error("No token was in the paylod of the message during the Obo request.");
             }
 
-            return oboToken;
+            return oboToken.ToResult();
         }
     }
 

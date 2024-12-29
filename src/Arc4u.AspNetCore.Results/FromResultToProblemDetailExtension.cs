@@ -3,7 +3,6 @@ using System.Diagnostics;
 using Arc4u.Results;
 using Arc4u.Results.Validation;
 using FluentResults;
-using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,9 +16,9 @@ public static class FromResultToProblemDetailExtension
     {
         _fromErrors = fromErrors;
     }
-    private static Func<IEnumerable<IError>, ProblemDetails> _fromErrors = _from;
+    private static Func<IEnumerable<IError>, ProblemDetails> _fromErrors = From;
 
-    private static ProblemDetails _from(IEnumerable<IError> errors)
+    private static ProblemDetails From(IEnumerable<IError> errors)
     {
         if (errors.OfType<ValidationError>().Any())
         {

@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using Arc4u.Diagnostics;
 using Arc4u.OAuth2.Token;
 using Arc4u.Security.Principal;
+using FluentResults;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -37,7 +38,7 @@ public class OpenIdBearerInjectorMiddleware
             _activitySource ??= activitySourceFactory.GetArc4u();
 
             using var activity = _activitySource?.StartActivity("Inject bearer token in header", ActivityKind.Producer);
-            TokenInfo? tokenInfo = null;
+            Result<TokenInfo> tokenInfoResult = new();
 
             if (_options.OnBehalfOfOpenIdSettings is not null && _options.OnBehalfOfOpenIdSettings.Values.Any())
             {
@@ -47,15 +48,17 @@ public class OpenIdBearerInjectorMiddleware
 
                     if (provider is null)
                     {
-                        logger.Technical().LogError($"The token provider {_options.OboProviderKey} is not found!");
-                        return;
+                        tokenInfoResult.WithError($"The token provider {_options.OboProviderKey} is not found!");
                     }
 
-                    tokenInfo = await provider.GetTokenAsync(_options.OnBehalfOfOpenIdSettings, null).ConfigureAwait(false);
+                    if (tokenInfoResult.IsSuccess)
+                    {
+                        tokenInfoResult = await provider!.GetTokenAsync(_options.OnBehalfOfOpenIdSettings, null).ConfigureAwait(false);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    logger.Technical().Exception(ex).Log();
+                    tokenInfoResult = new ExceptionalError(ex);
                 }
 
             }
@@ -67,24 +70,28 @@ public class OpenIdBearerInjectorMiddleware
 
                     if (provider is null)
                     {
-                        logger.Technical().LogError($"The token provider {_options.OpenIdSettings.Values[TokenKeys.ProviderIdKey]} is not found!");
-                        return;
+                        tokenInfoResult.WithError($"The token provider {_options.OpenIdSettings.Values[TokenKeys.ProviderIdKey]} is not found!");
                     }
 
-                    tokenInfo = await provider.GetTokenAsync(_options.OpenIdSettings, null).ConfigureAwait(false);
+                    if (tokenInfoResult.IsSuccess)
+                    {
+                        tokenInfoResult = await provider!.GetTokenAsync(_options.OpenIdSettings, null).ConfigureAwait(false);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    logger.Technical().Exception(ex).Log();
+                    tokenInfoResult = new ExceptionalError(ex);
                 }
             }
 
-            if (tokenInfo is not null)
+            if (tokenInfoResult.IsSuccess)
             {
-                var authorization = new AuthenticationHeaderValue("Bearer", tokenInfo.Token).ToString();
+                var authorization = new AuthenticationHeaderValue("Bearer", tokenInfoResult.Value.Token).ToString();
                 context.Request!.Headers.Remove("Authorization");
                 context.Request.Headers.Append("Authorization", authorization);
             }
+
+            tokenInfoResult.LogIfFailed();
         }
 
         await _next.Invoke(context).ConfigureAwait(false);

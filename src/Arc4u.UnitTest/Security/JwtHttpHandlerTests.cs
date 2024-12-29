@@ -30,19 +30,12 @@ using Xunit;
 
 namespace Arc4u.UnitTest.Security;
 
-public class JwtHandlerToTest : JwtHttpHandler
+public class JwtHandlerToTest(IScopedServiceProviderAccessor scopedServiceProviderAccessor, ILogger<JwtHandlerToTest> logger, IOptionsMonitor<SimpleKeyValueSettings> keyValuesSettingsOption, string resolvingName) : JwtHttpHandler(scopedServiceProviderAccessor, logger, keyValuesSettingsOption.Get(resolvingName))
 {
-    public JwtHandlerToTest(IScopedServiceProviderAccessor scopedServiceProviderAccessor, ILogger<JwtHandlerToTest> logger, IOptionsMonitor<SimpleKeyValueSettings> keyValuesSettingsOption, string resolvingName) : base(scopedServiceProviderAccessor, logger, keyValuesSettingsOption.Get(resolvingName))
-    {
-    }
 }
 
-public class JwtHandlerToTest2 : JwtHttpHandler
+public class JwtHandlerToTest2(IServiceProvider serviceProvider, ILogger<JwtHandlerToTest> logger, IOptionsMonitor<SimpleKeyValueSettings> keyValuesSettingsOption, string resolvingName) : JwtHttpHandler(serviceProvider, logger, keyValuesSettingsOption.Get(resolvingName))
 {
-    public JwtHandlerToTest2(IServiceProvider serviceProvider, ILogger<JwtHandlerToTest> logger, IOptionsMonitor<SimpleKeyValueSettings> keyValuesSettingsOption, string resolvingName)
-        : base(serviceProvider, logger, keyValuesSettingsOption.Get(resolvingName))
-    {
-    }
 }
 /// <summary>
 /// This test will control the different scenario defined for the usage of the JWtHttpHandler.

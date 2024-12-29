@@ -1,6 +1,4 @@
 using FluentResults;
-using FluentValidation;
-using FluentValidation.Results;
 
 namespace Arc4u.Results.Validation;
 
@@ -8,12 +6,9 @@ public class ValidationError : Error
 {
     private ValidationError(string message)
     {
-        _failure = new ValidationFailure
-        {
-            Severity = Severity.Error,
-            ErrorMessage = message,
-            ErrorCode = string.Empty
-        };
+        Message = message;
+        Code = string.Empty;
+        Severity = Severity.Error;
     }
 
     public static ValidationError Create(string errorMessage)
@@ -21,34 +16,32 @@ public class ValidationError : Error
         return new ValidationError(errorMessage);
     }
 
-    public ValidationError WithSeverity(Severity severity = Severity.Error)
+    public ValidationError WithSeverity(Severity severity)
     {
-        _failure.Severity = severity;
+        Severity = severity;
         return this;
     }
 
     public ValidationError WithCode(string code)
     {
-        _failure.ErrorCode = code;
+        Code = code;
         return this;
     }
 
-    public ValidationError(ValidationFailure failure)
+    public new ValidationError WithMetadata(string key, object value)
     {
-        _failure = failure;
-        Message = failure.ErrorMessage;
-        foreach (var m in failure.ToMetadata())
-        {
-            Metadata.Add(m.Key, m.Value);
-        }
+        Metadata.Add(key, value);
+        return this;
     }
 
-    private readonly ValidationFailure _failure;
+    public string Code { get; private set; }
 
-    public string Code => _failure.ErrorCode;
-    public Severity Severity => _failure.Severity;
+    public Severity Severity { get; private set; }
 
-    public static implicit operator ValidationError(ValidationFailure failure) => new(failure);
+    public static implicit operator Result(ValidationError error)
+    {
+        return Result.Fail(error);
+    }
 
 }
 

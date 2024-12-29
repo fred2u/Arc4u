@@ -1,6 +1,7 @@
 using Arc4u.AspNetCore.Results;
 using Arc4u.Results;
 using Arc4u.Results.Validation;
+using Arc4u.Validation;
 using AutoFixture;
 using AutoFixture.AutoMoq;
 using FluentAssertions;

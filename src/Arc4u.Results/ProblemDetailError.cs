@@ -68,4 +68,8 @@ public class ProblemDetailError : Error
         return this;
     }
 
+    public static implicit operator Result(ProblemDetailError error)
+    {
+        return Result.Fail(error);
+    }
 }

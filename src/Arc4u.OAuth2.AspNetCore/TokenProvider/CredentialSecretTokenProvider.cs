@@ -4,6 +4,7 @@ using Arc4u.Dependency.Attribute;
 using Arc4u.OAuth2.Extensions;
 using Arc4u.OAuth2.Security.Principal;
 using Arc4u.OAuth2.Token;
+using FluentResults;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.OAuth2.TokenProvider;
@@ -19,7 +20,7 @@ public class CredentialSecretTokenProvider(IServiceProvider container, ILogger<C
     private const string Credential = "Credential";
     private const string BasicProviderId = "BasicProviderId";
 
-    public async Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? _)
+    public async Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? _)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -27,7 +28,7 @@ public class CredentialSecretTokenProvider(IServiceProvider container, ILogger<C
 
         if (settings.Values.ContainsKey(Password) && settings.Values.ContainsKey(Credential))
         {
-            throw new ConfigurationException("User/Password or Credential must be filled in.");
+            return Result.Fail("User/Password or Credential must be filled in.");
         }
 
         if (settings.Values.ContainsKey(User) && settings.Values.ContainsKey(Password))
@@ -41,7 +42,7 @@ public class CredentialSecretTokenProvider(IServiceProvider container, ILogger<C
 
         if (!settings.Values.ContainsKey(BasicProviderId) || !container.TryGetService<ICredentialTokenProvider>(settings.Values[BasicProviderId], out var credentialToken))
         {
-            throw new ConfigurationException("No BasicProviderId exist to perform the request to the STS.");
+            return Result.Fail("No BasicProviderId exist to perform the request to the STS.");
         }
 
         // Switch to BasicToken provider.
@@ -56,7 +57,7 @@ public class CredentialSecretTokenProvider(IServiceProvider container, ILogger<C
         var result = await credentialToken!.GetTokenAsync(basicSettings, credential).ConfigureAwait(false);
         result.LogIfFailed();
 
-        return result.IsFailed ? null : result.Value;
+        return result;
     }
 
     public ValueTask SignOutAsync(IKeyValueSettings settings, CancellationToken cancellationToken)

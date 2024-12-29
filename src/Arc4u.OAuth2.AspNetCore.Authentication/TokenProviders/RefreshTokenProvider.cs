@@ -4,6 +4,7 @@ using Arc4u.Dependency.Attribute;
 using Arc4u.Diagnostics;
 using Arc4u.OAuth2.Options;
 using Arc4u.OAuth2.Token;
+using FluentResults;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Logging;
@@ -18,46 +19,33 @@ namespace Arc4u.OAuth2.TokenProviders;
 /// The Oidc token provider is responsible to get back an access token.
 /// </summary>
 [Export(typeof(ITokenRefreshProvider))]
-public class RefreshTokenProvider : ITokenRefreshProvider
+public class RefreshTokenProvider(TokenRefreshInfo refreshInfo,
+                            IOptionsMonitor<OpenIdConnectOptions> openIdConnectOptions,
+                            IOptions<OidcAuthenticationOptions> oidcOptions,
+                            IActivitySourceFactory activitySourceFactory,
+                            ILogger<RefreshTokenProvider> logger) : ITokenRefreshProvider
 {
     public const string ProviderName = "Refresh";
+    private readonly OidcAuthenticationOptions _oidcOptions = oidcOptions.Value;
+    private readonly ActivitySource? _activitySource = activitySourceFactory?.GetArc4u();
 
-    public RefreshTokenProvider(TokenRefreshInfo refreshInfo,
-                                IOptionsMonitor<OpenIdConnectOptions> openIdConnectOptions,
-                                IOptions<OidcAuthenticationOptions> oidcOptions,
-                                IActivitySourceFactory activitySourceFactory,
-                                ILogger<RefreshTokenProvider> logger)
+    public async Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
     {
-        _tokenRefreshInfo = refreshInfo;
-        _openIdConnectOptions = openIdConnectOptions;
-        _oidcOptions = oidcOptions.Value;
-        _logger = logger;
-        _activitySource = activitySourceFactory?.GetArc4u();
-    }
-
-    private readonly TokenRefreshInfo _tokenRefreshInfo;
-    private readonly IOptionsMonitor<OpenIdConnectOptions> _openIdConnectOptions;
-    private readonly OidcAuthenticationOptions _oidcOptions;
-    private readonly ILogger<RefreshTokenProvider> _logger;
-    private readonly ActivitySource? _activitySource;
-
-    public async Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
-    {
-        ArgumentNullException.ThrowIfNull(_tokenRefreshInfo);
-        ArgumentNullException.ThrowIfNull(_openIdConnectOptions);
+        ArgumentNullException.ThrowIfNull(refreshInfo);
+        ArgumentNullException.ThrowIfNull(openIdConnectOptions);
         ArgumentNullException.ThrowIfNull(_oidcOptions);
 
         using var activity = _activitySource?.StartActivity("Get on behal of token", ActivityKind.Producer);
 
         // Check if the token refresh is not expired. 
         // if yes => we have to log this and return a Unauthorized!
-        if (DateTime.UtcNow > _tokenRefreshInfo.RefreshToken.ExpiresOnUtc)
+        if (DateTime.UtcNow > refreshInfo.RefreshToken.ExpiresOnUtc)
         {
-            _logger.Technical().LogError($"Refresh token is expired: {_tokenRefreshInfo.RefreshToken.ExpiresOnUtc}.");
-            throw new InvalidOperationException("Refreshing the token is impossible, validity date is expired.");
+            logger.Technical().LogError($"Refresh token is expired: {refreshInfo.RefreshToken.ExpiresOnUtc}.");
+            return new Error("Refreshing the token is impossible, validity date is expired.");
         }
 
-        var options = _openIdConnectOptions.Get(OpenIdConnectDefaults.AuthenticationScheme) ?? throw new InvalidCastException("The OpenIdConnectOptions is not found!");
+        var options = openIdConnectOptions.Get(OpenIdConnectDefaults.AuthenticationScheme) ?? throw new InvalidCastException("The OpenIdConnectOptions is not found!");
         var metadata = await options!.ConfigurationManager!.GetConfigurationAsync(CancellationToken.None).ConfigureAwait(false);
 
         var pairs = new Dictionary<string, string>()
@@ -65,7 +53,7 @@ public class RefreshTokenProvider : ITokenRefreshProvider
                                             { "client_id", options.ClientId ?? string.Empty},
                                             { "client_secret", options.ClientSecret ?? string.Empty },
                                             { "grant_type", "refresh_token" },
-                                            { "refresh_token", _tokenRefreshInfo.RefreshToken.Token }
+                                            { "refresh_token", refreshInfo.RefreshToken.Token }
                                     };
         var content = new FormUrlEncodedContent(pairs);
 
@@ -75,11 +63,11 @@ public class RefreshTokenProvider : ITokenRefreshProvider
         {
             if (IdentityModelEventSource.ShowPII)
             {
-                _logger.Technical().LogError($"Refreshing the token is failing. {tokenResponse.ReasonPhrase}");
+                logger.Technical().LogError($"Refreshing the token is failing. {tokenResponse.ReasonPhrase}");
             }
             else
             {
-                _logger.Technical().LogError("Refreshing the token is failing. Enable PII to have more info.");
+                logger.Technical().LogError("Refreshing the token is failing. Enable PII to have more info.");
             }
         }
         // throws an exception is not 200OK.
@@ -94,23 +82,23 @@ public class RefreshTokenProvider : ITokenRefreshProvider
             if (payload.RootElement.TryGetProperty("expires_in", out var property) && property.TryGetInt32(out var seconds))
             {
                 var expirationAt = DateTimeOffset.UtcNow.AddSeconds(seconds).DateTime.ToUniversalTime();
-                _tokenRefreshInfo.AccessToken = new Token.TokenInfo("access_token", access_token, expirationAt);
+                refreshInfo.AccessToken = new Token.TokenInfo("access_token", access_token, expirationAt);
                 if (!string.IsNullOrEmpty(refresh_token))
                 {
-                    _tokenRefreshInfo.RefreshToken = new Token.TokenInfo("refresh_token", refresh_token, expirationAt);
+                    refreshInfo.RefreshToken = new Token.TokenInfo("refresh_token", refresh_token, expirationAt);
                 }
             }
             else
             {
-                _tokenRefreshInfo.AccessToken = new Token.TokenInfo("access_token", access_token);
+                refreshInfo.AccessToken = new Token.TokenInfo("access_token", access_token);
                 if (!string.IsNullOrEmpty(refresh_token))
                 {
-                    _tokenRefreshInfo.RefreshToken = new Token.TokenInfo("refresh_token", refresh_token, _tokenRefreshInfo.RefreshToken.ExpiresOnUtc);
+                    refreshInfo.RefreshToken = new Token.TokenInfo("refresh_token", refresh_token, refreshInfo.RefreshToken.ExpiresOnUtc);
                 }
             }
         }
 
-        return _tokenRefreshInfo.AccessToken;
+        return refreshInfo.AccessToken.ToResult();
     }
 
     public ValueTask SignOutAsync(IKeyValueSettings settings, CancellationToken cancellationToken)

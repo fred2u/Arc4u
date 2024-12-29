@@ -1,12 +1,9 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.Text.Json;
 using Arc4u.Diagnostics;
 using Arc4u.Security.Principal;
-using Google.Rpc;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
-using GrpcRichError;
 using Microsoft.Extensions.Logging;
 
 namespace Arc4u.gRPC.Interceptors;
@@ -15,7 +12,7 @@ public class AuthorizationInterceptor(ILogger<AuthorizationInterceptor> logger,
                                 IApplicationContext applicationContext,
                                 GrpcMethodInfo grpcMethodInfo) : Interceptor
 {
-    const string appSettings = "AppSettings";
+    //const string appSettings = "AppSettings";
 
     public override async Task<TResponse> UnaryServerHandler<TRequest, TResponse>(TRequest request, ServerCallContext context, UnaryServerMethod<TRequest, TResponse> continuation)
     {
@@ -43,21 +40,21 @@ public class AuthorizationInterceptor(ILogger<AuthorizationInterceptor> logger,
         {
             return await continuation(request, context).ConfigureAwait(false);
         }
-        catch (AppException ae)
-        {
-            throw new Google.Rpc.Status
-            {
-                Code = (int)StatusCode.Internal,
-                Message = appSettings,
-                Details =
-                {
-                    new ErrorInfo
-                    {
-                        Reason = JsonSerializer.Serialize(ae.Messages.Errors.Select(e => e.ToString()))
-                    }
-                }
-            }.ToException();
-        }
+        //catch (AppException ae)
+        //{
+        //    throw new Google.Rpc.Status
+        //    {
+        //        Code = (int)StatusCode.Internal,
+        //        Message = appSettings,
+        //        Details =
+        //        {
+        //            new ErrorInfo
+        //            {
+        //                Reason = JsonSerializer.Serialize(ae.Messages.Errors.Select(e => e.ToString()))
+        //            }
+        //        }
+        //    }.ToException();
+        //}
         catch (RpcException rcp)
         {
             logger.Technical().Exception(rcp).Log();
@@ -119,21 +116,21 @@ public class AuthorizationInterceptor(ILogger<AuthorizationInterceptor> logger,
         {
             await continuation(request, responseStream, context).ConfigureAwait(false);
         }
-        catch (AppException ae)
-        {
-            throw new Google.Rpc.Status
-            {
-                Code = (int)StatusCode.Internal,
-                Message = appSettings,
-                Details =
-                {
-                    new ErrorInfo
-                    {
-                        Reason = JsonSerializer.Serialize(ae.Messages)
-                    }
-                }
-            }.ToException();
-        }
+        //catch (AppException ae)
+        //{
+        //    throw new Google.Rpc.Status
+        //    {
+        //        Code = (int)StatusCode.Internal,
+        //        Message = appSettings,
+        //        Details =
+        //        {
+        //            new ErrorInfo
+        //            {
+        //                Reason = JsonSerializer.Serialize(ae.Messages)
+        //            }
+        //        }
+        //    }.ToException();
+        //}
         catch (RpcException rcp)
         {
             logger.Technical().Exception(rcp).Log();
@@ -176,21 +173,21 @@ public class AuthorizationInterceptor(ILogger<AuthorizationInterceptor> logger,
         {
             await continuation(requestStream, responseStream, context).ConfigureAwait(false);
         }
-        catch (AppException ae)
-        {
-            throw new Google.Rpc.Status
-            {
-                Code = (int)StatusCode.Internal,
-                Message = appSettings,
-                Details =
-                {
-                    new ErrorInfo
-                    {
-                        Reason = JsonSerializer.Serialize(ae.Messages)
-                    }
-                }
-            }.ToException();
-        }
+        //catch (AppException ae)
+        //{
+        //    throw new Google.Rpc.Status
+        //    {
+        //        Code = (int)StatusCode.Internal,
+        //        Message = appSettings,
+        //        Details =
+        //        {
+        //            new ErrorInfo
+        //            {
+        //                Reason = JsonSerializer.Serialize(ae.Messages)
+        //            }
+        //        }
+        //    }.ToException();
+        //}
         catch (RpcException rcp)
         {
             logger.Technical().Exception(rcp).Log();

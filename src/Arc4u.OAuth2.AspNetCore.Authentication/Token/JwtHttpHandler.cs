@@ -135,18 +135,19 @@ public class JwtHttpHandler : DelegatingHandler
         }
 
         _logger.Technical().System("Requesting an authentication token.").Log();
-        var tokenInfo = await provider.GetTokenAsync(_settings, null).ConfigureAwait(false);
+        var tokenInfoResult = await provider.GetTokenAsync(_settings, null).ConfigureAwait(false);
 
-        if (tokenInfo is null)
+        if (tokenInfoResult.IsFailed)
         {
             _logger.Technical().System($"No token is provided for {GetType().Name}, Check next Delegate Handler").Log();
+            tokenInfoResult.Log();
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
 
         // check if the token is still valid.
         // This is due to gRPC. It is possible that a gRPC streaming call is not closed and the token in the HttpContext is expired.
         // It is also possible this with OAuth where the token is added to the Identity and used like this => no refresh of the token is possible.
-        if (tokenInfo.ExpiresOnUtc < DateTime.UtcNow)
+        if (tokenInfoResult.Value.ExpiresOnUtc < DateTime.UtcNow)
         {
             _logger.Technical().System($"Token is expired! Next Hanlder will be called.").Log();
             return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -155,16 +156,16 @@ public class JwtHttpHandler : DelegatingHandler
         _logger.Technical().System("Remove any Bearer token attached.").Log();
         request.Headers.Remove("Bearer");
 
-        var scheme = inject ? tokenInfo.TokenType : "Bearer";
+        var scheme = inject ? tokenInfoResult.Value.TokenType : "Bearer";
         _logger.Technical().System($"Add the {scheme} token to provide authentication evidence.").Log();
 
         if (_supportedSchemes.Any(s => s.Equals(scheme, StringComparison.OrdinalIgnoreCase)))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue(scheme, tokenInfo.Token);
+            request.Headers.Authorization = new AuthenticationHeaderValue(scheme, tokenInfoResult.Value.Token);
         }
         else
         {
-            request.Headers.Add(scheme, tokenInfo.Token);
+            request.Headers.Add(scheme, tokenInfoResult.Value.Token);
         }
 
         // Add ActivityId if founded!

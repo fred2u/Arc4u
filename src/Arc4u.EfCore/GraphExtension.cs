@@ -87,7 +87,7 @@ public static class GraphExtension
 
         if (stringPath.Contains('.'))
         {
-            throw new AppException(OnlyLevelOneIsAllowed);
+            throw new InvalidOperationException(OnlyLevelOneIsAllowed);
         }
 
         return graph.Includes.Where(i => i.StartsWith(stringPath)).Aggregate<string, IQueryable<T>>(query, (queryable, i) => queryable.BuildInclude(i) ?? queryable);

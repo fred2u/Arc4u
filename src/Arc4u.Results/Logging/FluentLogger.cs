@@ -100,11 +100,11 @@ public class FluentLogger : IResultLogger
         }
     }
 
-    private logDelegate GetLogger(FluentValidation.Severity severity) => severity switch
+    private logDelegate GetLogger(Severity severity) => severity switch
     {
-        FluentValidation.Severity.Error => _logger.Business().Error,
-        FluentValidation.Severity.Warning => _logger.Business().Warning,
-        FluentValidation.Severity.Info => _logger.Business().Information,
+        Severity.Error => _logger.Business().Error,
+        Severity.Warning => _logger.Business().Warning,
+        Severity.Info => _logger.Business().Information,
         _ => _logger.Business().Debug,
     };
 

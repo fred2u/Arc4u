@@ -1,13 +1,17 @@
+using Arc4u.OAuth2.Token;
 using Arc4u.Results;
 using Arc4u.Results.Validation;
+using Arc4u.Validation;
 using AutoFixture;
 using AutoFixture.AutoMoq;
 using FluentAssertions;
 using FluentResults;
 using FluentValidation;
 using FluentValidation.Results;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Severity = FluentValidation.Severity;
 
 namespace Arc4u.UnitTest.Results;
 public class ResultTests
@@ -19,6 +23,22 @@ public class ResultTests
     }
 
     readonly Fixture _fixture;
+
+    [Fact]
+    [Trait("Category", "CI")]
+    public void Test_EmptyResult_Should()
+    {
+        Result<TokenInfo> result = new();
+        var flag = false;
+
+        var sut = result.OnSuccess(() =>
+        {
+            flag = true;
+        });
+
+        flag.Should().BeTrue();
+        sut.Should().BeSameAs(result);
+    }
 
     [Fact]
     [Trait("Category", "CI")]
@@ -205,7 +225,7 @@ public class ResultTests
     [Trait("Category", "CI")]
     public void MessageDetail_tests()
     {
-        ValidationError error = new ValidationFailure() { ErrorMessage = "A", ErrorCode = "Code" };
+        var error = new ValidationFailure() { ErrorMessage = "A", ErrorCode = "Code" }.ToValidationError();
 
         error.Message.Should().Be("A");
     }
@@ -223,15 +243,62 @@ public class ResultTests
         var error = sut.Errors[0].As<ValidationError>();
         error.Message.Should().Be("A");
         error.Code.Should().Be("Code");
-        error.Metadata["Severity"].Should().Be(Severity.Warning);
+        error.Severity.Should().Be(Arc4u.Results.Validation.Severity.Error);
+    }
 
+    [Fact]
+    [Trait("Category", "CI")]
+    public void Test_Implicit_ProblemDetailError_To_Result_Should()
+    {
+        var error = ProblemDetailError.Create(_fixture.Create<string>())
+                                      .WithSeverity(_fixture.Create<string>())
+                                      .WithStatusCode(StatusCodes.Status400BadRequest)
+                                      .WithTitle(_fixture.Create<string>())
+                                      .WithType(_fixture.Create<Uri>())
+                                      .WithInstance(_fixture.Create<string>());
+
+        Result result = error;
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Count.Should().Be(1);
+        result.Errors.First().Should().BeOfType<ProblemDetailError>();
+        var problem = result.Errors.First().As<ProblemDetailError>();
+        problem.Message.Should().Be(error.Message);
+        problem.StatusCode.Should().Be(error.StatusCode);
+        problem.Title.Should().Be(error.Title);
+        problem.Severity.Should().Be(error.Severity);
+        problem.Instance.Should().Be(error.Instance);
+    }
+    [Fact]
+    [Trait("Category", "CI")]
+    public void Test_Implicit_ValidationError_To_Result_Should()
+    {
+        var error = ValidationError.Create(_fixture.Create<string>())
+                                   .WithCode(_fixture.Create<string>())
+                                   .WithSeverity(Arc4u.Results.Validation.Severity.Warning)
+                                   .WithMetadata("key", _fixture.Create<string>());
+
+        Result result = error;
+
+        result.IsFailed.Should().BeTrue();
+        result.Errors.Count.Should().Be(1);
+        result.Errors.First().Should().BeOfType<ValidationError>();
+        var validationError = result.Errors.First().As<ValidationError>();
+        validationError.Message.Should().Be(error.Message);
+        validationError.Code.Should().Be(error.Code);
+        validationError.Severity.Should().Be(error.Severity);
+        validationError.Metadata.Count.Should().Be(1);
+        validationError.Metadata["key"].Should().Be(error.Metadata["key"]);
     }
 
     private sealed class Validation : AbstractValidator<string>
     {
         public Validation()
         {
-            RuleFor(s => s).NotEmpty().WithMessage("A").WithErrorCode("Code").WithSeverity(Severity.Warning);
+            RuleFor(s => s).NotEmpty()
+                           .WithMessage("A")
+                           .WithErrorCode("Code")
+                           .WithSeverity(Severity.Error);
         }
     }
 }

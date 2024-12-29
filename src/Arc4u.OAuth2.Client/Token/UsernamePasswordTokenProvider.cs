@@ -25,7 +25,7 @@ public class UsernamePasswordTokenProvider(ISecureCache secureCache, INetworkInf
     private string passwordStoreKey = default!;
     private IKeyValueSettings Settings = default!;
 
-    public async Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
+    public async Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? platformParameters)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -39,7 +39,7 @@ public class UsernamePasswordTokenProvider(ISecureCache secureCache, INetworkInf
         // Make the token expired 1 minute before a usage so we will not given back a token close to the expiration.
         if (null != tokenInfo && tokenInfo.ExpiresOnUtc > DateTime.UtcNow.AddMinutes(1))
         {
-            return tokenInfo;
+            return Result.Ok(tokenInfo);
         }
 
         // Check if we have the username and password.
@@ -56,7 +56,7 @@ public class UsernamePasswordTokenProvider(ISecureCache secureCache, INetworkInf
         {
             if (!container.TryGetService<IUserNamePasswordProvider>(out var usernamePasswordProvider))
             {
-                throw new AppException("No Token provider found in the container.");
+                return Result.Fail("No Token provider found in the container.");
             }
 
             // Ask for the credentials and the await is blocked until the user has entered the information.
@@ -64,7 +64,7 @@ public class UsernamePasswordTokenProvider(ISecureCache secureCache, INetworkInf
             var hasCredential = await usernamePasswordProvider!.GetCredentials(upn, CheckCredentialsAsync).ConfigureAwait(false);
             if (!hasCredential.CredentialsEntered)
             {
-                return null;
+                return Result.Fail("No credential was provided!");
             }
 
             // We know we have a valid Upn and Password.

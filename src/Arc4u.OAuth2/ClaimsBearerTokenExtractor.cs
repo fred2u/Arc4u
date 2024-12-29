@@ -74,15 +74,16 @@ public class ClaimsBearerTokenExtractor : IClaimsFiller
                 }
 
                 _logger.Technical().System("Requesting an authentication token.").Log();
-                var tokenInfo = await provider.GetTokenAsync(providerSettings, claimsIdentity).ConfigureAwait(false);
+                var tokenInfoResult = await provider.GetTokenAsync(providerSettings, claimsIdentity).ConfigureAwait(false);
 
-                if (null == tokenInfo)
+                if (tokenInfoResult.IsFailed)
                 {
                     _logger.Technical().LogError("No token received from the provider.");
+                    tokenInfoResult.Log();
                     return result;
                 }
 
-                bearerToken = new JwtSecurityToken(tokenInfo.Token);
+                bearerToken = new JwtSecurityToken(tokenInfoResult.Value.Token);
             }
 
             result.AddRange(bearerToken.Claims.Select(c => new ClaimDto(c.Type, c.Value)));

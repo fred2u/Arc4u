@@ -58,7 +58,9 @@ public class BlazorController : ControllerBase
                 {
                     if (containerResolve.TryGetService<ITokenProvider>(settings!.Values[TokenKeys.ProviderIdKey], out var tokenProvider))
                     {
-                        accessToken = (await tokenProvider!.GetTokenAsync(settings, claimsIdentity).ConfigureAwait(false))?.Token;
+                        var result = await tokenProvider!.GetTokenAsync(settings, claimsIdentity).ConfigureAwait(false);
+                        result.LogIfFailed();
+                        accessToken = result.IsSuccess ? result.Value.Token : null;
                     }
                 }
             }

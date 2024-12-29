@@ -37,12 +37,6 @@ public class ManageExceptionsFilter(ILogger<ManageExceptionsFilter> logger, IApp
                                                         .WithSeverity("Error")
                                                         .WithType(new Uri("https://github.com/GFlisch/Arc4u/wiki/StatusCodes#unauthorized")));
                 break;
-            case AppException appException:
-                context.Result = new ObjectResult(new ValidationProblemDetails(new Dictionary<string, string[]> { { "Errors", appException.Messages.Errors.Select(e => e.ToString()!).ToArray() } })
-                                                        .WithTitle("Application errors")
-                                                        .WithStatusCode(StatusCodes.Status400BadRequest)
-                                                        .WithSeverity("Error"));
-                break;
             default:
                 context.Result = new ObjectResult(new ProblemDetails()
                                                         .WithTitle("Unexpected error.")

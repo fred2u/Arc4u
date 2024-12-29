@@ -1,10 +1,6 @@
-using System.Text.Json;
 using Arc4u.Dependency.Attribute;
-using FluentResults;
-using Google.Rpc;
 using Grpc.Core;
 using Grpc.Core.Interceptors;
-using GrpcRichError;
 
 namespace Arc4u.gRPC.Interceptors;
 
@@ -16,20 +12,20 @@ public class ClientErrorInterceptor : Interceptor
 {
     private static void HandleException(RpcException rpc)
     {
-        var error = rpc.GetDetail<ErrorInfo>();
+        //var error = rpc.GetDetail<ErrorInfo>();
 
-        if (null != error && rpc.Message.Equals("AppSettings", StringComparison.InvariantCultureIgnoreCase))
-        {
-            var messages = JsonSerializer.Deserialize<string[]>(error.Reason) ?? [];
-            throw new AppException(Result.Fail(messages));
-        }
+        //if (null != error && rpc.Message.Equals("AppSettings", StringComparison.InvariantCultureIgnoreCase))
+        //{
+        //    var messages = JsonSerializer.Deserialize<string[]>(error.Reason) ?? [];
+        //    throw new AppException(Result.Fail(messages));
+        //}
 
         if (StatusCode.PermissionDenied == rpc.StatusCode)
         {
             throw new UnauthorizedAccessException(rpc?.Status.Detail ?? "Access is denied.");
         }
 
-        throw new AppException(rpc.Message, rpc);
+        throw rpc;
     }
 
     private static void HandleException(AggregateException ag)
@@ -39,7 +35,7 @@ public class ClientErrorInterceptor : Interceptor
             HandleException(rpc);
         }
 
-        throw new AppException("Unknown", ag!);
+        throw new InvalidOperationException("Unknown", ag!);
     }
 
     #region UnaryCall

@@ -51,7 +51,7 @@ public class GraphExtensionTests
         Expression<Func<TestEntity, ICollection<TestEntity>>> path = e => e.RelatedEntities;
 
         // Act & Assert
-        var exception = Assert.Throws<AppException>(() => graph.ApplyReferences(queryable, path));
+        var exception = Assert.Throws<InvalidOperationException>(() => graph.ApplyReferences(queryable, path));
         Assert.Equal("It is not allowed to check more than one level!", exception.Message);
     }
 }

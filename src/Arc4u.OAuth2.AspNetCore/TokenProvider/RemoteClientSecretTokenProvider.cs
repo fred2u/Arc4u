@@ -1,6 +1,7 @@
 using Arc4u.Configuration;
 using Arc4u.Dependency.Attribute;
 using Arc4u.OAuth2.Token;
+using FluentResults;
 
 namespace Arc4u.OAuth2.TokenProvider;
 
@@ -9,7 +10,7 @@ public class RemoteClientSecretTokenProvider : ITokenProvider
 {
     public const string ProviderName = "RemoteSecret";
 
-    public Task<TokenInfo?> GetTokenAsync(IKeyValueSettings? settings, object? _)
+    public Task<Result<TokenInfo>> GetTokenAsync(IKeyValueSettings? settings, object? _)
     {
         ArgumentNullException.ThrowIfNull(settings);
 
@@ -19,7 +20,8 @@ public class RemoteClientSecretTokenProvider : ITokenProvider
 
         if (!settings.Values.ContainsKey(TokenKeys.ClientSecretHeader))
         {
-            throw new ConfigurationException("Client secret Header is missing. Cannot process the request.");
+
+            return Task.FromResult(Result.Fail<TokenInfo>(new Error("Client secret Header is missing. Cannot process the request.")));
         }
 
         if (!settings.Values.ContainsKey(TokenKeys.ClientSecret))
@@ -29,7 +31,7 @@ public class RemoteClientSecretTokenProvider : ITokenProvider
 
         var clientSecret = settings.Values[TokenKeys.ClientSecret];
 
-        return Task.FromResult<TokenInfo?>(new TokenInfo(settings.Values[TokenKeys.ClientSecretHeader], clientSecret, DateTime.UtcNow + TimeSpan.FromHours(1)));
+        return Task.FromResult(Result.Ok(new TokenInfo(settings.Values[TokenKeys.ClientSecretHeader], clientSecret, DateTime.UtcNow + TimeSpan.FromHours(1))));
 
     }
 

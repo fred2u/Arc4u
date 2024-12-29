@@ -156,14 +156,16 @@ public class OAuth2Interceptor : Interceptor
                 return;
             }
 
-            var tokenInfo = provider.GetTokenAsync(_settings, claimsIdentity).Result;
+            var tokenInfoResult = provider.GetTokenAsync(_settings, claimsIdentity).Result;
 
-            if (tokenInfo is null)
+            if (tokenInfoResult.IsFailed)
             {
                 _logger.Technical().System($"No token is provided for {GetType().Name}, Check next Interceptor").Log();
+                tokenInfoResult.Log();
                 return;
             }
 
+            var tokenInfo = tokenInfoResult.Value;
             if (tokenInfo.ExpiresOnUtc < DateTime.UtcNow)
             {
                 _logger.Technical().System($"Token is expired! Next Interceptor will be called.").Log();

@@ -36,9 +36,12 @@ public class RemoteSecretsTokenProviderTests
 
         // act
         var sut = _fixture.Create<RemoteClientSecretTokenProvider>();
-        var token = await sut.GetTokenAsync(settings, null);
+        var tokenResult = await sut.GetTokenAsync(settings, null);
 
         // assert
+        tokenResult.Should().NotBeNull();
+        tokenResult.IsSuccess.Should().BeTrue();
+        var token = tokenResult.Value;
         token.Should().NotBeNull();
         token!.Token.Should().Be(options.ClientSecret);
         token.TokenType.Should().Be(options.HeaderKey);
@@ -84,7 +87,7 @@ public class RemoteSecretsTokenProviderTests
     {
         // arrange
         var options = _fixture.Create<RemoteSecretSettingsOptions>();
-
+        
         var settings = new SimpleKeyValueSettings(new Dictionary<string, string>()
         {
             {TokenKeys.ProviderIdKey, RemoteClientSecretTokenProvider.ProviderName },
@@ -93,10 +96,10 @@ public class RemoteSecretsTokenProviderTests
 
         // act
         var sut = _fixture.Create<RemoteClientSecretTokenProvider>();
-        var exception = await Record.ExceptionAsync(async () => await sut.GetTokenAsync(settings, null).ConfigureAwait(false));
+        var result = await sut.GetTokenAsync(settings, null);
 
         // assert
-        exception.Should().NotBeNull();
-        exception.Should().BeOfType<ConfigurationException>();
+        result.IsFailed.Should().BeTrue();
+        result.Errors.First().Message.Should().Be("Client secret Header is missing. Cannot process the request.");  
     }
 }

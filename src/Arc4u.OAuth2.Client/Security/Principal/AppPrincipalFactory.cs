@@ -101,21 +101,21 @@ public class AppPrincipalFactory(IServiceProvider container, INetworkInformation
 
         var result = new Result();
         // Check the settings contains the service url.
-        TokenInfo? token = null;
+        Result<TokenInfo> tokenResult = new();
         try
         {
-            token = await provider!.GetTokenAsync(settings, parameter).ConfigureAwait(true);
+            tokenResult = await provider!.GetTokenAsync(settings, parameter).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            logger.Technical().LogException(ex);
+            tokenResult = new ExceptionalError(ex);
         }
 
-        if (null != token)
+        if (tokenResult.IsSuccess)
         {
             // The token has claims filled by the STS.
             // We can fill the new federated identity with the claims from the token.
-            var jwtToken = new JwtSecurityToken(token.Token);
+            var jwtToken = new JwtSecurityToken(tokenResult.Value.Token);
             var expTokenClaim = jwtToken.Claims.FirstOrDefault(c => c.Type.Equals(tokenExpirationClaimType, StringComparison.InvariantCultureIgnoreCase));
             long expTokenTicks = 0;
             if (null != expTokenClaim)
@@ -127,7 +127,7 @@ public class AppPrincipalFactory(IServiceProvider container, INetworkInformation
             var dummyIdentity = new ClaimsIdentity(jwtToken.Claims);
             var cachedClaims = GetClaimsFromCache(dummyIdentity);
 
-            identity.BootstrapContext = token.Token;
+            identity.BootstrapContext = tokenResult.Value.Token;
 
             // if we have a token "cached" from the system, we can take the authorization claims from the cache (if exists)...
             // so we avoid too many backend calls for nothing.
@@ -204,7 +204,7 @@ public class AppPrincipalFactory(IServiceProvider container, INetworkInformation
         }
         else
         {
-            result.WithError(ValidationError.Create("No class was found to fill the authorization to the principal.").WithSeverity(FluentValidation.Severity.Warning));
+            result.WithError(ValidationError.Create("No class was found to fill the authorization to the principal.").WithSeverity(Severity.Warning));
         }
 
         return result;
@@ -219,7 +219,7 @@ public class AppPrincipalFactory(IServiceProvider container, INetworkInformation
         }
         else
         {
-            return Result.Fail(ValidationError.Create("No class was found to fill the principal profile.").WithSeverity(FluentValidation.Severity.Warning));
+            return Result.Fail(ValidationError.Create("No class was found to fill the principal profile.").WithSeverity(Severity.Warning));
         }
     }
 
