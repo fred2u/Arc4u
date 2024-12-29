@@ -53,17 +53,14 @@ public class CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IO
     private Result GetContext(IKeyValueSettings settings, out string clientId, out AuthorityOptions? authority, out string scope, out string clientSecret)
     {
         // Check the information.
-        Result result = new();
-
         if (null == settings)
         {
-            result.WithValidationError("Settings parameter cannot be null.");
             clientId = string.Empty;
             authority = null;
             scope = string.Empty;
             clientSecret = string.Empty;
 
-            return result;
+            return ValidationError.Create("Settings parameter cannot be null.");
         }
 
         // Valdate arguments.
@@ -78,7 +75,12 @@ public class CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IO
 
         if (!settings.Values.ContainsKey(TokenKeys.ClientIdKey))
         {
-            result.WithValidationError("ClientId is missing. Cannot process the request.");
+            clientId = string.Empty;
+            authority = null;
+            scope = string.Empty;
+            clientSecret = string.Empty;
+
+            return ValidationError.Create("ClientId is missing. Cannot process the request.");
         }
 
         _logger.Technical().Debug($"Creating an authentication context for the request.").Log();
@@ -86,7 +88,7 @@ public class CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IO
         clientSecret = settings.Values.ContainsKey(TokenKeys.ClientSecret) ? settings.Values[TokenKeys.ClientSecret] : string.Empty;
         // More for backward compatibility! We should throw an error message if scope is not defined...
         scope = !settings.Values.ContainsKey(TokenKeys.Scope) ? "openid" : settings.Values[TokenKeys.Scope];
-        return result;
+        return Result.Ok();
     }
 
     private async Task<Result<TokenInfo>> GetTokenInfoAsync(string? clientSecret, string clientId, Uri tokenEndpoint, string scope, string upn, string pwd)
@@ -159,11 +161,11 @@ public class CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IO
                             error_description = "No error description";
                         }
 
-                        return Result.Fail(ValidationError.Create($"{error_description} ({upn})").WithCode(tokenErrorCode ?? string.Empty));
+                        return ValidationError.Create($"{error_description} ({upn})").WithCode(tokenErrorCode ?? string.Empty);
                     }
                 }
                 // if we can't write a better exception, issue a more general one
-                return Result.Fail(ValidationError.Create($"{response.StatusCode} occured while requesting a token for {upn}").WithCode("TokenError"));
+                return ValidationError.Create($"{response.StatusCode} occured while requesting a token for {upn}").WithCode("TokenError");
             }
 
             // at this point, we *must* have a valid Json response. The values are a mixture of strings and numbers, so we deserialize the JsonElements
@@ -186,7 +188,7 @@ public class CredentialTokenProvider(ILogger<CredentialTokenProvider> logger, IO
         catch (Exception ex)
         {
             _logger.Technical().Exception(ex).Log();
-            return Result.Fail(ValidationError.Create(ex.Message).WithCode("Rejected"));
+            return ValidationError.Create(ex.Message).WithCode("Rejected");
         }
     }
 }

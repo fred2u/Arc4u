@@ -195,19 +195,16 @@ public class AppPrincipalFactory(IServiceProvider container, INetworkInformation
     /// </summary>
     private Result<Authorization> BuildAuthorization(ClaimsIdentity identity)
     {
-        var result = new Result<Authorization>();
         // We need to fill the authorization and user profile from the provider!
         if (container.TryGetService(out IClaimAuthorizationFiller? claimAuthorizationFiller))
         {
             var authorization = claimAuthorizationFiller!.GetAuthorization(identity);
-            result = Result.Ok(authorization).WithSuccess("Fill the authorization information to the principal.");
+            return Result.Ok(authorization).WithSuccess("Fill the authorization information to the principal.");
         }
         else
         {
-            result.WithError(ValidationError.Create("No class was found to fill the authorization to the principal.").WithSeverity(Severity.Warning));
+            return ValidationError.Create("No class was found to fill the authorization to the principal.").WithSeverity(Severity.Warning);
         }
-
-        return result;
     }
 
     private Result<UserProfile> BuildProfile(ClaimsIdentity identity)
@@ -219,7 +216,7 @@ public class AppPrincipalFactory(IServiceProvider container, INetworkInformation
         }
         else
         {
-            return Result.Fail(ValidationError.Create("No class was found to fill the principal profile.").WithSeverity(Severity.Warning));
+            return ValidationError.Create("No class was found to fill the principal profile.").WithSeverity(Severity.Warning);
         }
     }
 
