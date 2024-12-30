@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Arc4u.Caching;
+using Arc4u.Serializer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.Extensions.Configuration;
@@ -22,9 +23,11 @@ public static class CacheStoreExtension
         {
             var loggerFactory = services.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
             var cacheContext = services.GetRequiredService<ICacheContext>();
+            var serializer = services.GetRequiredService<IObjectSerialization>();
+
             return new ConfigureOptions<KeyManagementOptions>(options =>
             {
-                options.XmlRepository = new CacheStore(cacheContext, loggerFactory, validate.CacheKey, validate.CacheName);
+                options.XmlRepository = new CacheStore(cacheContext, loggerFactory, serializer, validate.CacheKey, validate.CacheName);
             });
         });
 

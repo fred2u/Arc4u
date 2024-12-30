@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using System.Xml.Linq;
 using Arc4u.Caching;
 using Arc4u.Diagnostics;
+using Arc4u.Serializer;
 using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.Extensions.Logging;
 
@@ -10,8 +10,9 @@ namespace Arc4u.OAuth2.DataProtection;
 
 public class CacheStore : IXmlRepository
 {
-    public CacheStore(ICacheContext cacheContext, ILoggerFactory loggerFactory, [DisallowNull] string cacheKey, string? cacheName = null)
+    public CacheStore(ICacheContext cacheContext, ILoggerFactory loggerFactory, IObjectSerialization serialization, [DisallowNull] string cacheKey, string? cacheName = null)
     {
+        ArgumentNullException.ThrowIfNull(serialization);
         ArgumentNullException.ThrowIfNull(cacheContext);
         ArgumentNullException.ThrowIfNull(loggerFactory);
         ArgumentNullException.ThrowIfNull(cacheKey);
@@ -20,6 +21,7 @@ public class CacheStore : IXmlRepository
         _cacheContext = cacheContext;
         _cacheName = cacheName;
         _cacheKey = cacheKey;
+        _serialization = serialization;
 
         _cache = new Lazy<ICache>(() =>
         {
@@ -33,6 +35,7 @@ public class CacheStore : IXmlRepository
     private readonly string _cacheKey;
     private readonly string? _cacheName;
     private readonly Lazy<ICache> _cache;
+    private readonly IObjectSerialization _serialization;
 
     public IReadOnlyCollection<XElement> GetAllElements()
     {
@@ -43,11 +46,11 @@ public class CacheStore : IXmlRepository
     {
         var result = new List<XElement>();
 
-        var content = _cache.Value.Get<string>(_cacheKey);
+        var content = _cache.Value.Get<byte[]>(_cacheKey);
 
-        if (!string.IsNullOrWhiteSpace(content))
+        if (content is not null)
         {
-            var list = JsonSerializer.Deserialize<List<string>>(content);
+            var list = _serialization.Deserialize<List<string>>(content);
 
             if (list is null)
             {
@@ -67,7 +70,7 @@ public class CacheStore : IXmlRepository
 
         result.Insert(0, element);
 
-        var content = JsonSerializer.Serialize<List<string>>(result.Select(e => e.ToString(SaveOptions.DisableFormatting)).ToList());
+        var content = _serialization.Serialize<List<string>>(result.Select(e => e.ToString(SaveOptions.DisableFormatting)).ToList());
 
         _cache.Value.Put(_cacheKey, content);
     }

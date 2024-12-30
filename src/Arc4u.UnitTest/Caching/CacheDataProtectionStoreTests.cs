@@ -66,8 +66,9 @@ public class CacheDataProtectionStoreTests
 
         var loggerFactory = container.GetRequiredService<ILoggerFactory>();
         var cacheContext = container.GetRequiredService<ICacheContext>();
+        var serializer = container.GetRequiredService<IObjectSerialization>();
         // act
-        var sut = new CacheStore(cacheContext, loggerFactory, "DataProtection", "Volatile");
+        var sut = new CacheStore(cacheContext, loggerFactory, serializer, "DataProtection", "Volatile");
 
         var element = new XElement("Data", new XAttribute("CreationDate", DateTime.UtcNow),
                             new XElement("Cert", "Begin Certficate"));
@@ -95,9 +96,9 @@ public class CacheDataProtectionStoreTests
 
         var loggerFactory = container.GetRequiredService<ILoggerFactory>();
         var cacheContext = container.GetRequiredService<ICacheContext>();
-
+        var serializer = container.GetRequiredService<IObjectSerialization>();
         // act
-        var sut = new CacheStore(cacheContext, loggerFactory, "DataProtection");
+        var sut = new CacheStore(cacheContext, loggerFactory, serializer, "DataProtection");
 
         var element = new XElement("Data", new XAttribute("CreationDate", DateTime.UtcNow),
                             new XElement("Cert", "Begin Certficate"));
@@ -125,9 +126,9 @@ public class CacheDataProtectionStoreTests
 
         var loggerFactory = container.GetRequiredService<ILoggerFactory>();
         var cacheContext = container.GetRequiredService<ICacheContext>();
-
+        var serializer = container.GetRequiredService<IObjectSerialization>();
         // act
-        var exception = Record.Exception(() => new CacheStore(cacheContext, loggerFactory, default!));
+        var exception = Record.Exception(() => new CacheStore(cacheContext, loggerFactory, serializer, default!));
 
         // assert
         exception.Should().NotBeNull();
