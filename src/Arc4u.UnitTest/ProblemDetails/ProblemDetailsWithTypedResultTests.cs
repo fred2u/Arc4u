@@ -161,7 +161,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(value);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]
@@ -188,7 +188,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(msg1);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
 
         //problem = problems[1];
         //problem.Should().NotBeNull();
@@ -269,7 +269,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(value);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]
@@ -430,7 +430,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(value);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]
@@ -457,7 +457,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(msg1);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
 
         //problem = problems[1];
         //problem.Should().NotBeNull();
@@ -538,7 +538,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(value);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]
@@ -683,7 +683,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(value);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]
@@ -707,7 +707,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(msg1);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
 
         //problem = problems[1];
         //problem.Should().NotBeNull();
@@ -780,7 +780,7 @@ public class ProblemDetailsWithTypedResultTests
         problem.Should().NotBeNull();
         problem.Title.Should().Be("Error.");
         problem.Detail.Should().Be(value);
-        problem.Status.Should().Be(StatusCodes.Status500InternalServerError);
+        problem.Status.Should().Be(StatusCodes.Status400BadRequest);
     }
 
     [Fact]

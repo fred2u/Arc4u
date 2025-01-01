@@ -88,10 +88,10 @@ public class CompressionAndSpeedTests
     private void ShowMeasurements(IEnumerable<Measurement> measurements, string title)
     {
         _output.WriteLine(title);
-        _output.WriteLine("Method\tTime\tSize");
+        _output.WriteLine($"{"Method",-20} {"Time",-20} {"Size",-10}");
         foreach (var measurement in measurements)
         {
-            _output.WriteLine($"{measurement.Method}\t{measurement.TimeSpan}\t{measurement.Size}");
+            _output.WriteLine($"{measurement.Method,-20} {measurement.TimeSpan,-20} {measurement.Size,-10}");
         }
 
         _output.WriteLine("");

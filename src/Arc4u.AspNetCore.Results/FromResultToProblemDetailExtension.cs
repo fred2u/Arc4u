@@ -10,6 +10,10 @@ namespace Arc4u.AspNetCore.Results;
 
 public static class FromResultToProblemDetailExtension
 {
+    private static readonly Uri UnexpectedErrorType = new("https://github.com/GFlisch/Arc4u/wiki/StatusCodes#unexpected-error");
+    private static readonly Uri ExpectedErrorType = new("https://github.com/GFlisch/Arc4u/wiki/StatusCodes#expected-error");
+    private static readonly Uri ValidationErrorType = new("https://github.com/GFlisch/Arc4u/wiki/StatusCodes#validation-error");
+    private static readonly Uri AboutBlankType = new("about:blank");
     public static Func<IEnumerable<IError>, ProblemDetails> FromError => errors => _fromErrors(errors);
 
     public static void SetFromErrorFactory(Func<IEnumerable<IError>, ProblemDetails> fromErrors)
@@ -20,6 +24,13 @@ public static class FromResultToProblemDetailExtension
 
     private static ProblemDetails From(IEnumerable<IError> errors)
     {
+        if (errors.OfType<IExceptionalError>().Any())
+        {
+            var exceptionalError = errors.OfType<IExceptionalError>().First();
+            var result = Result.Fail(exceptionalError);
+            return result.ToGenericMessage(Activity.Current?.Id, false);
+        }
+
         if (errors.OfType<ValidationError>().Any())
         {
             //TODO: what to do when Code is null.
@@ -32,7 +43,7 @@ public static class FromResultToProblemDetailExtension
             return new ValidationProblemDetails(orderedErrors)
                         .WithTitle("Error from validation.")
                         .WithStatusCode(StatusCodes.Status422UnprocessableEntity)
-                        .WithType(new Uri("https://github.com/GFlisch/Arc4u/wiki/StatusCodes#validation-error"));
+                        .WithType(ValidationErrorType);
         }
 
         if (errors.OfType<ProblemDetailError>().Any())
@@ -51,51 +62,52 @@ public static class FromResultToProblemDetailExtension
             }
 
             return problem;
-
         }
 
         var error = errors.First();
         return new ProblemDetails()
                     .WithTitle("Error.")
                     .WithDetail(error.Message)
-                    .WithStatusCode(StatusCodes.Status500InternalServerError)
-                    .WithType(new Uri("about:blank"))
+                    .WithStatusCode(StatusCodes.Status400BadRequest)
+                    .WithType(AboutBlankType)
                     .WithSeverity(Severity.Error.ToString());
     }
 
-    public static ProblemDetails ToGenericMessage<TResult>(this Result<TResult> result)
+    public static ProblemDetails ToGenericMessage<TResult>(this Result<TResult> result, bool unexpectedType = true)
     {
         return ToGenericMessage(result, Activity.Current?.Id);
     }
 
-    public static ProblemDetails ToGenericMessage<TResult>(this Result<TResult> result, string? activityId)
+    public static ProblemDetails ToGenericMessage<TResult>(this Result<TResult> result, string? activityId, bool unexpectedType = true)
     {
         return result.ToResult().ToGenericMessage(activityId);
     }
 
-    public static ProblemDetails ToGenericMessage(this Result result)
+    public static ProblemDetails ToGenericMessage(this Result result, bool unexpectedType = true)
     {
         return result.ToGenericMessage(Activity.Current?.Id);
     }
 
-    public static ProblemDetails ToGenericMessage(this Result result, string? activityId)
+    public static ProblemDetails ToGenericMessage(this Result result, string? activityId, bool unexpectedType = true)
     {
         result.LogIfFailed();
+
+        var type = unexpectedType ? UnexpectedErrorType : ExpectedErrorType;
 
         if (activityId is not null)
         {
             return new ProblemDetails()
                 .WithTitle("A technical error occured!")
                 .WithDetail($"Contact the application owner. A message has been logged with id: {activityId}.")
-                .WithType(new Uri("about:blank"))
-                .WithStatusCode(StatusCodes.Status500InternalServerError);
+                .WithType(type)
+                .WithStatusCode(unexpectedType ? StatusCodes.Status500InternalServerError : StatusCodes.Status400BadRequest);
         }
 
         return new ProblemDetails()
                 .WithTitle("A technical error occured!")
                 .WithDetail("Contact the application owner. A message has been logged.")
-                .WithType(new Uri("about:blank"))
-                .WithStatusCode(StatusCodes.Status500InternalServerError);
+                .WithType(type)
+                .WithStatusCode(unexpectedType ? StatusCodes.Status500InternalServerError : StatusCodes.Status400BadRequest);
 
     }
 
@@ -114,14 +126,7 @@ public static class FromResultToProblemDetailExtension
             result.WithError(new ExceptionalError(new UnreachableException("Creating a ProblemDetails on a success Result does not make any sense!")));
         }
 
-        // Generate a generic message and log! No sensitive information can be sent outside directly to a user =. vulnerabilities.
-        if (result.IsFailed && result.Errors.OfType<IExceptionalError>().Any())
-        {
-            return result.ToGenericMessage();
-        }
-
         return FromResultToProblemDetailExtension.FromError(result.Errors);
-
     }
 
     /// <summary>
@@ -139,12 +144,6 @@ public static class FromResultToProblemDetailExtension
             result.WithError(new ExceptionalError(new UnreachableException("Creating a ProblemDetails on a success Result does not make any sense!")));
         }
 
-        if (result.IsFailed && result.Errors.OfType<IExceptionalError>().Any())
-        {
-            return result.ToGenericMessage();
-        }
-
         return FromResultToProblemDetailExtension.FromError(result.Errors);
-
     }
 }
