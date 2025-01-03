@@ -31,11 +31,11 @@ public class LogGrpcMonitoringTimeElapsedMiddleware
     {
         var logger = context.RequestServices.GetService<IContainerResolve>()?.Resolve<ILogger>();
 
-        var startingTimesptamp = Stopwatch.GetTimestamp();
+        var startingTimestamp = Stopwatch.GetTimestamp();
 
         await _next(context).ConfigureAwait(false);
 
-        var elapsed = Stopwatch.GetElapsedTime(startingTimesptamp);
+        var elapsed = Stopwatch.GetElapsedTime(startingTimestamp);
 
         try
         {
