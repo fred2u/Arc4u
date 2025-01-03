@@ -27,9 +27,6 @@ public class LogMonitoringTimeElapsedMiddleware
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var container = context.RequestServices.GetRequiredService<IContainerResolve>();
-        var logger = container.Resolve<ILogger>();
-
         var startingTimestamp = Stopwatch.GetTimestamp();
 
         await _next(context).ConfigureAwait(false);
