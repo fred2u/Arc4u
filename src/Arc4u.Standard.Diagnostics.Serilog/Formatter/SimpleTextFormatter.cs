@@ -37,7 +37,7 @@ public class SimpleTextFormatter : ITextFormatter
     {
         try
         {
-            var (Category, Application, Identity, ClassType, MethodName, ActivityId, ProcessId, ThreadId, Stacktrace, Properties) = Helper.ExtractEventInfo(logEvent);
+            var (Category, _, Identity, ClassType, MethodName, ActivityId, ProcessId, ThreadId, Stacktrace, Properties) = Helper.ExtractEventInfo(logEvent);
 
             using var properties = new StringWriter();
             using var messageText = new StringWriter();
@@ -69,9 +69,9 @@ public class SimpleTextFormatter : ITextFormatter
                 output.WriteLine(Stacktrace);
             }
         }
-        catch (Exception)
-        {
-        }
+        // We don't want to throw an exception and log this on the system who is assigned to log an information.
+        catch (Exception) { }
+
     }
 }
 
@@ -87,8 +87,8 @@ internal static class DumpException
         var i = 0;
         foreach (var message in messages)
         {
-            sb.Append("".PadLeft(i++ * 4));
-            sb.Append("|---".PadLeft(i > 0 ? 4 : 0));
+            sb.Append("".PadLeft(i * 4));
+            sb.Append("|---".PadLeft(i++ > 0 ? 4 : 0));
             sb.AppendLine(message);
         }
 
