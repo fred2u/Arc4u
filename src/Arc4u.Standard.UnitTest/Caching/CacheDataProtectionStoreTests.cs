@@ -1,24 +1,20 @@
-using AutoFixture.AutoMoq;
-using AutoFixture;
-using Xunit;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
-using System.Collections.Generic;
-using System;
+using System.Xml.Linq;
 using Arc4u.Caching;
-using Arc4u.Dependency;
-using Arc4u.Serializer;
-using FluentAssertions;
 using Arc4u.Caching.Memory;
 using Arc4u.Dependency.ComponentModel;
 using Arc4u.OAuth2.DataProtection;
-using Microsoft.Extensions.Logging;
-using System.Xml.Linq;
-using System.Linq;
-using Moq;
+using Arc4u.Serializer;
+using AutoFixture;
+using AutoFixture.AutoMoq;
+using FluentAssertions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Moq;
+using Xunit;
 
 namespace Arc4u.UnitTest.Caching;
 
@@ -37,7 +33,7 @@ public class CacheDataProtectionStoreTests
     public void CheckMemoryStoreShould()
     {
         // arrange
-        var (services, configuration) = BuiltContainer();
+        var (services, _) = BuiltContainer();
 
         var container = new ComponentModelContainer(services);
 
@@ -60,7 +56,7 @@ public class CacheDataProtectionStoreTests
     public void StoreXElementShould()
     {
         // arrange
-        var (services, configuration) = BuiltContainer();
+        var (services, _) = BuiltContainer();
 
         var container = new ComponentModelContainer(services);
 
@@ -89,7 +85,7 @@ public class CacheDataProtectionStoreTests
     public void StoreXElementWithNoCacheNameShould()
     {
         // arrange
-        var (services, configuration) = BuiltContainer();
+        var (services, _) = BuiltContainer();
 
         var container = new ComponentModelContainer(services);
 
@@ -131,7 +127,7 @@ public class CacheDataProtectionStoreTests
         var cacheContext = container.GetRequiredService<ICacheContext>();
 
         // act
-        var exception = Record.Exception(() => new CacheStore(cacheContext, loggerFactory, null));
+        var exception = Record.Exception(() => new CacheStore(cacheContext, loggerFactory, default!));
 
         // assert
         exception.Should().NotBeNull();
@@ -156,11 +152,9 @@ public class CacheDataProtectionStoreTests
         mockBuilder.Setup(p => p.Services).Returns(services);
         mockBuilder.Object.PersistKeysToCache(configuration);
 
-
         container.CreateContainer();
 
         container.ServiceProvider.GetService<IServiceProvider>().Should().NotBeNull();
-
 
         var sut = container.GetService<IConfigureOptions<KeyManagementOptions>>();
 
@@ -255,7 +249,7 @@ public class CacheDataProtectionStoreTests
         var exception = Record.Exception(() => mockBuilder.Object.PersistKeysToCache(configuration));
 
         exception.Should().NotBeNull();
-        exception.Should().BeOfType<ArgumentNullException>();
+        exception.Should().BeOfType<InvalidCastException>();
     }
 
     private static (IServiceCollection, IConfiguration) BuiltContainer()

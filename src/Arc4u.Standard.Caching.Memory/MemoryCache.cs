@@ -68,13 +68,19 @@ public class MemoryCache : BaseDistributeCache<MemoryCache>, ICache
                 if (!string.IsNullOrWhiteSpace(config.SerializerName))
                 {
                     IsInitialized = Container.TryResolve<IObjectSerialization>(config.SerializerName!, out var serializerFactory);
-                    SerializerFactory = serializerFactory;
+                    if (IsInitialized)
+                    {
+                        SerializerFactory = serializerFactory!;
+                    }
                 }
 
                 if (!IsInitialized)
                 {
                     IsInitialized = Container.TryResolve<IObjectSerialization>(out var serializerFactory);
-                    SerializerFactory = serializerFactory;
+                    if (IsInitialized)
+                    {
+                        SerializerFactory = serializerFactory!;
+                    }
                 }
 
                 if (!IsInitialized)
@@ -96,5 +102,5 @@ public class MemoryCache : BaseDistributeCache<MemoryCache>, ICache
         }
     }
 
-    public override string ToString() => Name ?? throw new NullReferenceException();
+    public override string ToString() => Name ?? throw new InvalidOperationException("The 'Name' property must not be null.");
 }
