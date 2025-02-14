@@ -59,7 +59,7 @@ public class CompressionAndSpeedTests
 
     private Measurement Measure(IObjectSerialization objectSerialization, string method)
     {
-        var sw = Stopwatch.StartNew();
+        var startingTimestamp = Stopwatch.GetTimestamp();
         var size = 0;
         for (var iterations = 0; iterations < 10000; ++iterations)
         {
@@ -81,8 +81,8 @@ public class CompressionAndSpeedTests
 
             // add other relevant cases here.
         }
-        sw.Stop();
-        return new Measurement { Method = method, TimeSpan = sw.Elapsed, Size = size };
+        var elapsed = Stopwatch.GetElapsedTime(startingTimestamp);
+        return new Measurement { Method = method, TimeSpan = elapsed, Size = size };
     }
 
     private void ShowMeasurements(IEnumerable<Measurement> measurements, string title)

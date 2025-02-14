@@ -31,11 +31,11 @@ public class LogGrpcMonitoringTimeElapsedMiddleware
     {
         var logger = context.RequestServices.GetService<IContainerResolve>()?.Resolve<ILogger>();
 
-        var stopwatch = Stopwatch.StartNew();
+        var startingTimestamp = Stopwatch.GetTimestamp();
 
         await _next(context).ConfigureAwait(false);
 
-        stopwatch.Stop();
+        var elapsed = Stopwatch.GetElapsedTime(startingTimestamp);
 
         try
         {
@@ -48,11 +48,11 @@ public class LogGrpcMonitoringTimeElapsedMiddleware
                     logger?.Monitoring()
                            .From(descriptor.ServiceType, descriptor.Method.Name)
                            .Information($"Time to complete method call")
-                           .Add("Elapsed", stopwatch.Elapsed.TotalMilliseconds)
+                           .Add("Elapsed", elapsed.TotalMilliseconds)
                            .Add("StatusCode", context.Response.StatusCode)
                            .Log();
 
-                    _log?.Invoke(descriptor.ServiceType, stopwatch.Elapsed);
+                    _log?.Invoke(descriptor.ServiceType, elapsed);
                 }
             }
 

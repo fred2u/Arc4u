@@ -16,14 +16,12 @@ public class LogMonitoringTimeElapsedMiddleware
     public LogMonitoringTimeElapsedMiddleware(RequestDelegate next)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
-
         _log = null;
     }
 
     public LogMonitoringTimeElapsedMiddleware(RequestDelegate next, Action<Type, TimeSpan> extraLog)
     {
         _next = next ?? throw new ArgumentNullException(nameof(next));
-
         _log = extraLog;
     }
 
@@ -34,11 +32,11 @@ public class LogMonitoringTimeElapsedMiddleware
         var container = context.RequestServices.GetRequiredService<IContainerResolve>();
         var logger = container.Resolve<ILogger>();
 
-        var stopwatch = Stopwatch.StartNew();
+        var startingTimestamp = Stopwatch.GetTimestamp();
 
         await _next(context).ConfigureAwait(false);
 
-        stopwatch.Stop();
+        var elapsed = Stopwatch.GetElapsedTime(startingTimestamp);
 
         try
         {
@@ -51,14 +49,13 @@ public class LogMonitoringTimeElapsedMiddleware
                     logger?.Monitoring()
                            .From(descriptor.MethodInfo.DeclaringType, descriptor.MethodInfo.Name)
                            .Information($"Time to complete method call")
-                           .Add("Elapsed", stopwatch.Elapsed.TotalMilliseconds)
+                           .Add("Elapsed", elapsed.TotalMilliseconds)
                            .Add("StatusCode", context.Response.StatusCode)
                            .Log();
 
-                    _log?.Invoke(descriptor.MethodInfo.DeclaringType, stopwatch.Elapsed);
+                    _log?.Invoke(descriptor.MethodInfo.DeclaringType, elapsed);
                 }
             }
-
         }
         catch (Exception ex)
         {
